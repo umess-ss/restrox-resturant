@@ -168,7 +168,7 @@ export const topSellingItems = async (req, res) => {
         as: 'menuItem',
       },
     },
-    { $unwind: { path: '$menuItem', preserveNullAndEmpty: true } },
+    { $unwind: { path: '$menuItem', preserveNullAndEmptyArrays: true } },
     {
       $project: {
         _id: 0,
@@ -206,7 +206,7 @@ export const salesByCategory = async (req, res) => {
         as: 'mi',
       },
     },
-    { $unwind: { path: '$mi', preserveNullAndEmpty: true } },
+    { $unwind: { path: '$mi', preserveNullAndEmptyArrays: true } },
     {
       $group: {
         _id: { $ifNull: ['$mi.category', 'unknown'] },
@@ -570,7 +570,7 @@ export const dashboardSnapshot = async (req, res) => {
       { $match: paidFilter(startOf('month'), new Date()) },
       { $unwind: '$items' },
       { $lookup: { from: 'menuitems', localField: 'items.menuItem', foreignField: '_id', as: 'mi' } },
-      { $unwind: { path: '$mi', preserveNullAndEmpty: true } },
+      { $unwind: { path: '$mi', preserveNullAndEmptyArrays: true } },
       { $group: { _id: { $ifNull: ['$mi.category', 'unknown'] }, revenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } } } },
       { $project: { _id: 0, category: '$_id', revenue: { $round: ['$revenue', 2] } } },
       { $sort: { revenue: -1 } },

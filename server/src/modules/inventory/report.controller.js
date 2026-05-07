@@ -160,7 +160,7 @@ export const stockMovement = async (req, res) => {
         as: 'user',
       },
     },
-    { $unwind: { path: '$user', preserveNullAndEmpty: true } },
+    { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
     {
       $project: {
         type: 1,
