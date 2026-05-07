@@ -13,6 +13,7 @@ import {
   getBill,
   checkoutOrder,
   cancelOrder,
+  updateItemStatus,
 } from './order.controller.js';
 
 const router = Router();
@@ -73,5 +74,13 @@ router.post(
 );
 
 router.post('/:id/cancel', can('orders:write'), cancelOrder);
+
+router.patch(
+  '/:id/items/:itemId/status',
+  can('orders:write'),
+  [body('status').isIn(['pending', 'preparing', 'ready']).withMessage('Invalid item status')],
+  validate,
+  updateItemStatus
+);
 
 export default router;

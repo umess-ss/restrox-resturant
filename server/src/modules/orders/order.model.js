@@ -10,6 +10,12 @@ const orderItemSchema = new mongoose.Schema(
     quantity: { type: Number, required: true, min: 1 },
     notes: { type: String, trim: true },           // e.g. "no onions"
     kotPrinted: { type: Boolean, default: false }, // has this item been sent to kitchen?
+    // Item-level KDS status — chef updates per item
+    itemStatus: {
+      type: String,
+      enum: ['pending', 'preparing', 'ready'],
+      default: 'pending',
+    },
   },
   { _id: true }
 );

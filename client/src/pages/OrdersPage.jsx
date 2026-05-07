@@ -9,6 +9,7 @@ import {
   checkoutOrder,
   cancelOrder,
 } from '../api/orders.api.js';
+import useSocket from '../hooks/useSocket.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -270,6 +271,7 @@ export default function OrdersPage() {
   const [view, setView] = useState('orders'); // 'orders' | 'kitchen'
   const [statusFilter, setStatusFilter] = useState('');
   const [billOrderId, setBillOrderId] = useState(null);
+  const { socket, connected } = useSocket();
 
   const load = useCallback(async () => {
     try {
@@ -291,6 +293,20 @@ export default function OrdersPage() {
     const t = setInterval(load, 30000);
     return () => clearInterval(t);
   }, [load]);
+
+  // Real-time socket updates
+  useEffect(() => {
+    if (!socket) return;
+    const refresh = () => load();
+    socket.on('order:created', refresh);
+    socket.on('order:status_changed', refresh);
+    socket.on('order:item_status_changed', refresh);
+    return () => {
+      socket.off('order:created', refresh);
+      socket.off('order:status_changed', refresh);
+      socket.off('order:item_status_changed', refresh);
+    };
+  }, [socket, load]);
 
   const advance = async (id, current) => {
     try {
@@ -329,7 +345,12 @@ export default function OrdersPage() {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-gray-800">Orders</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-semibold text-gray-800">Orders</h2>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${connected ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+            {connected ? '● Live' : '○ Offline'}
+          </span>
+        </div>
         <div className="flex gap-2">
           <button
             onClick={() => setView('orders')}
@@ -341,7 +362,6 @@ export default function OrdersPage() {
           >👨‍🍳 Kitchen {kitchenOrders.length > 0 && <span className="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5">{kitchenOrders.length}</span>}</button>
         </div>
       </div>
-
       {view === 'orders' && (
         <>
           {/* Status filter */}

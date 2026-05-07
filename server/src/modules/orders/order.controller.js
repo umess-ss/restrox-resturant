@@ -6,6 +6,7 @@ import {
   generateKOT,
   generateBill,
   checkout as svcCheckout,
+  updateItemStatus as svcUpdateItemStatus,
 } from './order.service.js';
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
@@ -113,5 +114,14 @@ export const checkoutOrder = async (req, res) => {
 export const cancelOrder = async (req, res) => {
   const { note } = req.body;
   const order = await transitionStatus(req.params.id, 'cancelled', req.user._id, note || 'Cancelled');
+  res.json({ order });
+};
+
+// ─── KDS: item-level status ───────────────────────────────────────────────────
+
+export const updateItemStatus = async (req, res) => {
+  const { itemId } = req.params;
+  const { status } = req.body;
+  const order = await svcUpdateItemStatus(req.params.id, itemId, status, req.user._id);
   res.json({ order });
 };

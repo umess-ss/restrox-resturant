@@ -3,6 +3,7 @@ import { toast } from 'react-toastify';
 import { fetchTables } from '../api/tables.api.js';
 import { fetchMenuItems } from '../api/menu.api.js';
 import { createOrder, addItemsToOrder, printKOT } from '../api/orders.api.js';
+import useSocket from '../hooks/useSocket.js';
 
 const CATEGORY_ICONS = {
   appetizer: '🥗', main: '🍽️', dessert: '🍰', beverage: '🥤', special: '⭐',
@@ -85,6 +86,7 @@ export default function POSPage() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
+  const { socket, connected } = useSocket();
 
   const load = useCallback(async () => {
     const [t, m] = await Promise.all([fetchTables(), fetchMenuItems()]);
@@ -93,6 +95,29 @@ export default function POSPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Listen for real-time order status changes on the active order
+  useEffect(() => {
+    if (!socket || !activeOrder?._id) return;
+    socket.emit('join:order', activeOrder._id);
+
+    const handleUpdate = (updated) => {
+      if (updated._id === activeOrder._id || updated._id === activeOrder) {
+        setActiveOrder(updated);
+        if (updated.status === 'ready') toast.success(`Order ${updated.orderNumber} is ready!`);
+        if (updated.status === 'paid') { setActiveOrder(null); load(); }
+      }
+    };
+
+    socket.on('order:status_changed', handleUpdate);
+    socket.on('order:item_status_changed', handleUpdate);
+
+    return () => {
+      socket.emit('leave:order', activeOrder._id);
+      socket.off('order:status_changed', handleUpdate);
+      socket.off('order:item_status_changed', handleUpdate);
+    };
+  }, [socket, activeOrder?._id]);
 
   const selectTable = (table) => {
     setSelectedTable(table);
@@ -177,7 +202,12 @@ export default function POSPage() {
 
         {/* Table picker */}
         <div className="p-4 border-b border-gray-200 bg-white">
-          <p className="text-xs text-gray-500 font-medium mb-2">SELECT TABLE</p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-gray-500 font-medium">SELECT TABLE</p>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${connected ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+              {connected ? '● Live' : '○ Offline'}
+            </span>
+          </div>
           <div className="flex gap-2 flex-wrap">
             {tables.map((t) => (
               <button

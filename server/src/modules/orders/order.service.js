@@ -4,6 +4,8 @@ import Table from '../tables/table.model.js';
 import MenuItem from '../menu/menu.model.js';
 import { deductRecipeIngredients } from '../inventory/inventory.service.js';
 import logger from '../../config/logger.js';
+import { getIO } from '../../socket/io.js';
+import { emitOrderUpdate } from '../../socket/index.js';
 
 // ─── Status machine ───────────────────────────────────────────────────────────
 
@@ -99,6 +101,7 @@ export const createOrder = async ({ tableId, itemInputs, notes, taxRate, userId 
     await table.save({ session });
 
     await session.commitTransaction();
+    emitOrderUpdate(getIO(), order, 'order:created');
     return order;
   } catch (err) {
     await session.abortTransaction();
@@ -143,6 +146,7 @@ export const addItemsToOrder = async (orderId, itemInputs, userId) => {
   });
   Object.assign(order, financials);
   await order.save();
+  emitOrderUpdate(getIO(), order, 'order:items_added');
   return order;
 };
 
@@ -184,6 +188,7 @@ export const transitionStatus = async (orderId, newStatus, userId, note) => {
     });
   }
 
+  emitOrderUpdate(getIO(), order, 'order:status_changed');
   return order;
 };
 
@@ -218,6 +223,8 @@ export const generateKOT = async (orderId, userId) => {
 
   await order.save();
 
+  emitOrderUpdate(getIO(), order, 'order:kot_printed');
+
   return {
     kotNumber: order.kotNumber,
     orderNumber: order.orderNumber,
@@ -226,6 +233,38 @@ export const generateKOT = async (orderId, userId) => {
     printedAt: order.kotPrintedAt,
     items: newItems.map((i) => ({ name: i.name, quantity: i.quantity, notes: i.notes })),
   };
+};
+
+// ─── KDS: Item-level status ───────────────────────────────────────────────────
+
+/**
+ * Updates the status of a single item in an order (for KDS).
+ * When all items are 'ready', auto-advances the order to 'ready'.
+ */
+export const updateItemStatus = async (orderId, itemId, newStatus, userId) => {
+  const order = await Order.findById(orderId);
+  if (!order) throw Object.assign(new Error('Order not found'), { status: 404 });
+
+  const item = order.items.id(itemId);
+  if (!item) throw Object.assign(new Error('Item not found in order'), { status: 404 });
+
+  item.itemStatus = newStatus;
+
+  // Auto-advance order status based on item statuses
+  const allReady = order.items.every((i) => i.itemStatus === 'ready');
+  const anyPreparing = order.items.some((i) => i.itemStatus === 'preparing');
+
+  if (allReady && order.status === 'preparing') {
+    order.status = 'ready';
+    order.statusHistory.push({ status: 'ready', changedBy: userId, note: 'All items ready' });
+  } else if (anyPreparing && order.status === 'confirmed') {
+    order.status = 'preparing';
+    order.statusHistory.push({ status: 'preparing', changedBy: userId, note: 'Started preparing' });
+  }
+
+  await order.save();
+  emitOrderUpdate(getIO(), order, 'order:item_status_changed');
+  return order;
 };
 
 // ─── Bill ─────────────────────────────────────────────────────────────────────
