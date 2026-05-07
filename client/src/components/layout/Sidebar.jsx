@@ -5,6 +5,7 @@ const links = [
   { to: '/menu', label: 'Menu', icon: '🍽️' },
   { to: '/orders', label: 'Orders', icon: '📋' },
   { to: '/tables', label: 'Tables', icon: '🪑' },
+  { to: '/inventory', label: 'Inventory', icon: '📦' },
   { to: '/staff', label: 'Staff', icon: '👥' },
 ];
 

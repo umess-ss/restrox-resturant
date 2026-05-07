@@ -1,4 +1,6 @@
 import Order from './order.model.js';
+import { deductRecipeIngredients } from '../inventory/inventory.service.js';
+import logger from '../../config/logger.js';
 
 export const getOrders = async (req, res) => {
   const { status } = req.query;
@@ -29,9 +31,30 @@ export const createOrder = async (req, res) => {
 
 export const updateOrderStatus = async (req, res) => {
   const { status } = req.body;
-  const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true });
+
+  const order = await Order.findById(req.params.id);
   if (!order) return res.status(404).json({ message: 'Order not found' });
-  res.json(order);
+
+  const previousStatus = order.status;
+  order.status = status;
+  await order.save();
+
+  // Trigger recipe-based ingredient deduction when order is marked as served
+  if (status === 'served' && previousStatus !== 'served') {
+    try {
+      await deductRecipeIngredients(order.items, req.user._id, order._id);
+    } catch (err) {
+      // Stock deduction failure is logged but doesn't roll back the order status.
+      // An alert should be raised for manual reconciliation.
+      logger.error(`Stock deduction failed for order ${order._id}: ${err.message}`);
+      return res.json({
+        order,
+        warning: `Order marked served but stock deduction failed: ${err.message}`,
+      });
+    }
+  }
+
+  res.json({ order });
 };
 
 export const markOrderPaid = async (req, res) => {

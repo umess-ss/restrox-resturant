@@ -44,4 +44,9 @@ export const PERMISSIONS = {
   'staff:read':   [ROLES.MANAGER, ROLES.ADMIN],
   'staff:write':  [ROLES.MANAGER, ROLES.ADMIN],
   'staff:delete': [ROLES.ADMIN],
+
+  // Inventory
+  'inventory:read':   [ROLES.CHEF, ROLES.MANAGER, ROLES.ADMIN],
+  'inventory:write':  [ROLES.CHEF, ROLES.MANAGER, ROLES.ADMIN],
+  'inventory:delete': [ROLES.ADMIN],
 };
