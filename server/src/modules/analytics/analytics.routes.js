@@ -1,23 +1,16 @@
 import { Router } from 'express';
 import { protect, minRole } from '../../middlewares/auth.middleware.js';
+import { tenantContext } from '../../middlewares/tenant.middleware.js';
 import {
-  salesOverview,
-  revenueTrend,
-  topSellingItems,
-  salesByCategory,
-  hourlyDistribution,
-  paymentMethods,
-  inventorySummary,
-  profitAnalysis,
-  staffPerformance,
-  orderFunnel,
-  dashboardSnapshot,
+  salesOverview, revenueTrend, topSellingItems, salesByCategory,
+  hourlyDistribution, paymentMethods, inventorySummary, profitAnalysis,
+  staffPerformance, orderFunnel, dashboardSnapshot,
 } from './analytics.controller.js';
 
 const router = Router();
 
-// All analytics require at least manager role
-router.use(protect, minRole('manager'));
+// All analytics require manager+ and tenant context
+router.use(protect, tenantContext, minRole('manager'));
 
 router.get('/snapshot', dashboardSnapshot);
 router.get('/overview', salesOverview);

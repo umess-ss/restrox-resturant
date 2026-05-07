@@ -19,9 +19,10 @@ const useAuthStore = create(
       },
 
       logout: async () => {
-        try { await api.post('/auth/logout'); } catch { /* ignore */ }
+        // Always clear local state first — never let a failed API call block logout
         set({ user: null, accessToken: null });
         useTenantStore.getState().clear();
+        try { await api.post('/auth/logout'); } catch { /* server-side cleanup best-effort */ }
       },
 
       refreshToken: async () => {

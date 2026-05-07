@@ -27,7 +27,11 @@ api.interceptors.response.use(
   async (err) => {
     const original = err.config;
 
-    if (err.response?.status === 401 && !original._retry) {
+    // Don't retry auth endpoints — prevents infinite loops on logout/refresh
+    const isAuthEndpoint = original.url?.includes('/auth/logout') ||
+                           original.url?.includes('/auth/refresh');
+
+    if (err.response?.status === 401 && !original._retry && !isAuthEndpoint) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           queue.push({ resolve, reject });
@@ -47,6 +51,7 @@ api.interceptors.response.use(
         return api(original);
       } catch (refreshErr) {
         processQueue(refreshErr, null);
+        // logout() already clears state before calling the API, so this is safe
         useAuthStore.getState().logout();
         return Promise.reject(refreshErr);
       } finally {

@@ -67,14 +67,20 @@ export function SocketProvider({ children }) {
 
     socket.on('connect_error', async (err) => {
       setConnected(false);
-      // Token expired mid-session — try to refresh and reauth
-      if (err.message === 'Invalid token' || err.message === 'Authentication required') {
+      // Only attempt refresh once per connection attempt
+      if (
+        (err.message === 'Invalid token' || err.message === 'Authentication required') &&
+        !socket._reauthAttempted
+      ) {
+        socket._reauthAttempted = true;
         try {
           const newToken = await refreshToken();
           socket.auth = { token: newToken };
+          socket._reauthAttempted = false; // reset for next genuine expiry
           socket.connect();
         } catch {
-          // Refresh failed — user will be logged out by axios interceptor
+          // Refresh failed — axios interceptor will handle logout
+          socket._reauthAttempted = false;
         }
       }
     });

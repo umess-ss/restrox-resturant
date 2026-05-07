@@ -11,10 +11,47 @@ import Table from './modules/tables/table.model.js';
 import Ingredient from './modules/inventory/ingredient.model.js';
 import Recipe from './modules/inventory/recipe.model.js';
 import StaffProfile from './modules/staff/staffProfile.model.js';
+import Restaurant from './modules/saas/restaurant.model.js';
+import Branch from './modules/saas/branch.model.js';
 import logger from './config/logger.js';
 
 await mongoose.connect(process.env.MONGO_URI);
 logger.info('Connected to MongoDB');
+
+// ─── 0. Restaurant + Branch (SaaS tenant for seeded data) ────────────────────
+
+let restaurant = await Restaurant.findOne({ slug: 'demo-restaurant' });
+if (!restaurant) {
+  restaurant = await Restaurant.create({
+    name: 'Demo Restaurant',
+    slug: 'demo-restaurant',
+    email: 'admin@rms.com',
+    plan: 'enterprise',
+    isActive: true,
+    features: { kds: true, inventory: true, payroll: true, analytics: true },
+  });
+  logger.info('Created demo restaurant');
+} else {
+  logger.info('Demo restaurant exists');
+}
+
+let branch = await Branch.findOne({ restaurant: restaurant._id, isHeadquarters: true });
+if (!branch) {
+  branch = await Branch.create({
+    restaurant: restaurant._id,
+    name: 'Main Branch',
+    isHeadquarters: true,
+    isActive: true,
+  });
+  logger.info('Created main branch');
+} else {
+  logger.info('Main branch exists');
+}
+
+// Link restaurant owner
+if (!restaurant.owner) {
+  // Will be set after admin user is created below
+}
 
 // ─── 1. Users ─────────────────────────────────────────────────────────────────
 
@@ -30,13 +67,30 @@ const userMap = {};
 for (const u of USERS) {
   let user = await User.findOne({ email: u.email });
   if (!user) {
-    user = await User.create(u);
+    user = await User.create({ ...u, restaurant: restaurant._id, branch: branch._id });
     logger.info(`Created user: ${u.email}`);
   } else {
-    logger.info(`Exists: ${u.email}`);
+    // Patch existing users that don't have restaurant/branch assigned
+    if (!user.restaurant || !user.branch) {
+      await User.findByIdAndUpdate(user._id, {
+        restaurant: restaurant._id,
+        branch: branch._id,
+      });
+      user.restaurant = restaurant._id;
+      user.branch = branch._id;
+      logger.info(`Patched tenant fields: ${u.email}`);
+    } else {
+      logger.info(`Exists: ${u.email}`);
+    }
   }
   userMap[u.role] = userMap[u.role] || user;
   userMap[u.email] = user;
+}
+
+// Link restaurant owner to admin user
+if (!restaurant.owner && userMap['admin@rms.com']) {
+  await Restaurant.findByIdAndUpdate(restaurant._id, { owner: userMap['admin@rms.com']._id });
+  logger.info('Linked restaurant owner');
 }
 
 // ─── 2. Staff Profiles ────────────────────────────────────────────────────────

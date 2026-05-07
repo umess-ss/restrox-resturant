@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
 import { protect, can, authorize, selfOrAdmin } from '../../middlewares/auth.middleware.js';
+import { tenantContext } from '../../middlewares/tenant.middleware.js';
 import validate from '../../middlewares/validate.middleware.js';
 
 import { getStaff, getStaffMember, upsertProfile, updateStaff, deleteStaff } from './staff.controller.js';
@@ -18,7 +19,7 @@ import {
 } from './payroll.controller.js';
 
 const router = Router();
-router.use(protect);
+router.use(protect, tenantContext);
 
 // ─── Staff profiles ───────────────────────────────────────────────────────────
 

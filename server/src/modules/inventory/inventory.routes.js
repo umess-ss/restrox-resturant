@@ -1,35 +1,21 @@
 import { Router } from 'express';
-import { body, query } from 'express-validator';
+import { body } from 'express-validator';
 import { protect, can, authorize } from '../../middlewares/auth.middleware.js';
+import { tenantContext } from '../../middlewares/tenant.middleware.js';
 import validate from '../../middlewares/validate.middleware.js';
 
 import {
-  getIngredients,
-  getIngredient,
-  createIngredient,
-  updateIngredient,
-  deleteIngredient,
-  stockIn,
-  stockOut,
-  adjustStock,
-  getLowStock,
-  getTransactionHistory,
+  getIngredients, getIngredient, createIngredient, updateIngredient, deleteIngredient,
+  stockIn, stockOut, adjustStock, getLowStock, getTransactionHistory,
 } from './ingredient.controller.js';
-
 import { reportWastage, getWastageLog } from './wastage.controller.js';
 import { getRecipes, getRecipe, upsertRecipe, deleteRecipe, getRecipeCost } from './recipe.controller.js';
 import {
-  stockSummary,
-  consumptionReport,
-  wastageSummary,
-  stockMovement,
-  inventoryValuation,
+  stockSummary, consumptionReport, wastageSummary, stockMovement, inventoryValuation,
 } from './report.controller.js';
 
 const router = Router();
-
-// All inventory routes require authentication
-router.use(protect);
+router.use(protect, tenantContext);
 
 // ─── Ingredients ──────────────────────────────────────────────────────────────
 

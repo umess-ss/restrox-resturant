@@ -24,8 +24,16 @@ export const tenantContext = async (req, res, next) => {
     return next();
   }
 
+  // Legacy / single-tenant users with no restaurant assigned
+  // (seeded users, users created before SaaS migration)
+  // Allow through with empty filters so existing functionality is preserved.
   if (!req.user.restaurant) {
-    return res.status(403).json({ message: 'User is not associated with any restaurant' });
+    req.restaurantId = null;
+    req.branchId     = null;
+    req.restaurant   = null;
+    req.tenantFilter = {};
+    req.branchFilter = {};
+    return next();
   }
 
   const restaurant = await Restaurant.findById(req.user.restaurant);
