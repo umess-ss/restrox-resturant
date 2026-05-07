@@ -11,6 +11,7 @@ import orderRoutes from './modules/orders/order.routes.js';
 import tableRoutes from './modules/tables/table.routes.js';
 import staffRoutes from './modules/staff/staff.routes.js';
 import inventoryRoutes from './modules/inventory/inventory.routes.js';
+import analyticsRoutes from './modules/analytics/analytics.routes.js';
 import { errorHandler, notFound } from './middlewares/error.middleware.js';
 
 const app = express();
@@ -43,6 +44,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/tables', tableRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Health check
 app.get('/health', (_, res) => res.json({ status: 'ok' }));

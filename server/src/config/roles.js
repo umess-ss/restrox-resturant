@@ -49,4 +49,11 @@ export const PERMISSIONS = {
   'inventory:read':   [ROLES.CHEF, ROLES.MANAGER, ROLES.ADMIN],
   'inventory:write':  [ROLES.CHEF, ROLES.MANAGER, ROLES.ADMIN],
   'inventory:delete': [ROLES.ADMIN],
+
+  // Attendance (self clock-in is handled separately — all roles allowed)
+  'attendance:manage': [ROLES.MANAGER, ROLES.ADMIN],
+
+  // Payroll
+  'payroll:read':  [ROLES.MANAGER, ROLES.ADMIN],
+  'payroll:write': [ROLES.ADMIN],
 };
