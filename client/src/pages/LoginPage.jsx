@@ -15,8 +15,8 @@ export default function LoginPage() {
     try {
       await login(form.email, form.password);
       navigate('/');
-    } catch {
-      toast.error('Invalid credentials');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Unable to reach backend');
     } finally {
       setLoading(false);
     }

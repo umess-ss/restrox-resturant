@@ -13,6 +13,13 @@ const ROLE_ROOMS = {
   admin:   [ROOMS.pos,     ROOMS.managers, ROOMS.role('admin')],
 };
 
+const socketAllowedOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://192.168.18.6:5173',
+  process.env.CLIENT_URL,
+].filter(Boolean);
+
 // ─── Auth middleware ──────────────────────────────────────────────────────────
 
 const authenticateSocket = async (socket, next) => {
@@ -37,7 +44,7 @@ const authenticateSocket = async (socket, next) => {
 export const initSocket = (httpServer) => {
   const io = new Server(httpServer, {
     cors: {
-      origin: process.env.CLIENT_URL || 'http://localhost:5173',
+      origin: socketAllowedOrigins,
       credentials: true,
     },
     transports: ['websocket', 'polling'],
