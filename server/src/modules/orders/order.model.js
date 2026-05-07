@@ -73,8 +73,17 @@ const orderSchema = new mongoose.Schema(
     inventoryDeducted: { type: Boolean, default: false },
 
     // Customer QR ordering
-    source: { type: String, enum: ['pos', 'qr'], default: 'pos' },
-    customerName: { type: String, trim: true },
+    // source: 'pos' = placed by staff via POS, 'customer_qr' = placed by customer via QR scan
+    source: {
+      type: String,
+      enum: ['pos', 'customer_qr'],
+      default: 'pos',
+      index: true,
+    },
+    // Optional customer identity — only set for customer_qr orders
+    customerName:  { type: String, trim: true, maxlength: 60 },
+    customerPhone: { type: String, trim: true, maxlength: 20 },
+    customerNote:  { type: String, trim: true, maxlength: 200 },
 
     // Audit trail
     statusHistory: [statusHistorySchema],

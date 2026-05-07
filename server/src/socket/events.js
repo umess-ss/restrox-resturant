@@ -31,6 +31,9 @@ export const EVENTS = Object.freeze({
   CONNECTED:                'rms:connected',             // server → client on connect
   ERROR:                    'rms:error',
 
+  // ─── Customer QR ─────────────────────────────────────────────────────────
+  CUSTOMER_CALL_WAITER:     'customer:call_waiter',      // → pos room
+
   // ─── Client → Server ─────────────────────────────────────────────────────
   CLIENT_JOIN_ORDER:        'client:join_order',
   CLIENT_LEAVE_ORDER:       'client:leave_order',
@@ -45,7 +48,8 @@ export const ROOMS = Object.freeze({
   kitchen:          'kitchen',
   pos:              'pos',
   managers:         'managers',
-  role: (role)   => `role:${role}`,
-  order: (id)    => `order:${id}`,
-  table: (id)    => `table:${id}`,
+  role:   (role) => `role:${role}`,
+  order:  (id)   => `order:${id}`,
+  table:  (id)   => `table:${id}`,
+  branch: (id)   => `branch:${id}`,
 });

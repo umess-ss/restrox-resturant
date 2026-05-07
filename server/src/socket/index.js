@@ -242,3 +242,34 @@ export const emitAnalyticsUpdate = (io, snapshot) => {
   if (!io) return;
   io.to(ROOMS.managers).emit(EVENTS.ANALYTICS_SNAPSHOT, snapshot);
 };
+
+/**
+ * emitCustomerOrderEvent
+ * Emits a customer QR order event to all relevant rooms:
+ *   kitchen — so KDS picks it up immediately
+ *   pos     — so waiters see it
+ *   branch:{branchId} — branch-scoped listeners
+ *   table:{tableId}   — table-specific listeners (customer status page)
+ *   order:{orderId}   — order-specific listeners
+ *
+ * Reuses the existing orderPayload shape so KDS/POS handle it identically
+ * to a POS-created order.
+ */
+export const emitCustomerOrderEvent = (io, order, event) => {
+  if (!io) return;
+
+  const payload = orderPayload(order);
+
+  io.to(ROOMS.kitchen).emit(event, payload);
+  io.to(ROOMS.pos).emit(event, payload);
+  io.to(ROOMS.order(order._id)).emit(event, payload);
+
+  if (order.branch) {
+    io.to(ROOMS.branch(order.branch)).emit(event, payload);
+  }
+  if (order.table) {
+    io.to(ROOMS.table(order.table)).emit(event, payload);
+  }
+
+  logger.debug(`[WS] customer ${event} → order ${order.orderNumber}`);
+};
