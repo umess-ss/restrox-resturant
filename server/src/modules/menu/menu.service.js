@@ -137,6 +137,9 @@ export const updateRecipeWithDiff = async (menuItemId, newIngredients, notes) =>
     for (const [id] of newMap) {
       if (!oldMap.has(id)) diff.added.push({ ingredientId: id });
     }
+  } else {
+    // No existing recipe — every ingredient is new
+    diff.added = newIngredients.map((i) => ({ ingredientId: i.ingredient.toString() }));
   }
 
   const recipe = await Recipe.findOneAndUpdate(

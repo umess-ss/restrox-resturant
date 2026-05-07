@@ -7,7 +7,22 @@ export const notFound = (req, res, next) => {
 };
 
 export const errorHandler = (err, req, res, _next) => {
-  const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
+  // Mongoose validation errors → 422
+  if (err.name === 'ValidationError') {
+    return res.status(422).json({
+      message: 'Validation failed',
+      errors: Object.values(err.errors).map((e) => ({ field: e.path, message: e.message })),
+    });
+  }
+
+  // Mongoose duplicate key → 409
+  if (err.code === 11000) {
+    const field = Object.keys(err.keyValue || {})[0] || 'field';
+    return res.status(409).json({ message: `Duplicate value for ${field}` });
+  }
+
+  // Prefer explicit status set on the error, then res.statusCode, then 500
+  const statusCode = err.status || err.statusCode || (res.statusCode !== 200 ? res.statusCode : 500);
   logger.error(err.message);
   res.status(statusCode).json({
     message: err.message,

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { protect, can } from '../../middlewares/auth.middleware.js';
+import { protect, can, minRole } from '../../middlewares/auth.middleware.js';
 import validate from '../../middlewares/validate.middleware.js';
 import {
   getMenuItems,
@@ -20,8 +20,8 @@ import {
 const router = Router();
 
 // ─── Analytics (before /:id to avoid param collision) ────────────────────────
-router.get('/analytics/margins', protect, can('menu:read'), getAllMargins);
-router.get('/analytics/category-summary', protect, can('menu:read'), getCategorySummary);
+router.get('/analytics/margins', protect, minRole('manager'), getAllMargins);
+router.get('/analytics/category-summary', protect, minRole('manager'), getCategorySummary);
 
 // ─── Menu Items ───────────────────────────────────────────────────────────────
 router.get('/', getMenuItems);       // public
