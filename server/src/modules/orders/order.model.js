@@ -65,6 +65,12 @@ const orderSchema = new mongoose.Schema(
 
     // Payment
     paymentStatus: { type: String, enum: ['unpaid', 'paid', 'refunded'], default: 'unpaid' },
+    billStatus: {
+      type: String,
+      enum: ['not_requested', 'requested', 'presented', 'paid'],
+      default: 'not_requested',
+      index: true,
+    },
     paymentMethod: { type: String, enum: ['cash', 'card', 'upi', 'wallet', 'complimentary'] },
     paidAt: { type: Date },
     billGeneratedAt: { type: Date },

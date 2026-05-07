@@ -13,7 +13,7 @@ import Order from '../orders/order.model.js';
 import { calcFinancials } from '../orders/order.service.js';
 import { getIO } from '../../socket/io.js';
 import { emitCustomerOrderEvent, emitTableEvent } from '../../socket/index.js';
-import { EVENTS } from '../../socket/events.js';
+import { EVENTS, ROOMS } from '../../socket/events.js';
 import logger from '../../config/logger.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -26,6 +26,36 @@ const assertObjectId = (value, label) => {
   if (!mongoose.Types.ObjectId.isValid(value)) {
     throw Object.assign(new Error(`Invalid ${label}`), { status: 400 });
   }
+};
+
+const publicBillPayload = (order) => ({
+  orderNumber: order.orderNumber,
+  tableNumber: order.table?.number,
+  customerName: order.customerName,
+  customerPhone: order.customerPhone,
+  items: order.items.map((i) => ({
+    name: i.name,
+    quantity: i.quantity,
+    price: i.price,
+    lineTotal: +(i.price * i.quantity).toFixed(2),
+  })),
+  subtotal: order.subtotal,
+  tax: order.taxAmount,
+  discount: order.discountAmount || 0,
+  serviceCharge: 0,
+  totalAmount: order.totalAmount,
+  orderStatus: order.status,
+  paymentStatus: order.paymentStatus,
+  billStatus: order.billStatus,
+});
+
+const emitBillEvent = (io, order, event, payload) => {
+  if (!io) return;
+  io.to(ROOMS.pos).emit(event, payload);
+  io.to(ROOMS.kitchen).emit(event, payload);
+  io.to(ROOMS.order(order._id)).emit(event, payload);
+  if (order.branch) io.to(ROOMS.branch(order.branch)).emit(event, payload);
+  if (order.table?._id || order.table) io.to(ROOMS.table(order.table?._id || order.table)).emit(event, payload);
 };
 
 // ─── Validate table ───────────────────────────────────────────────────────────
@@ -86,17 +116,30 @@ export const getPublicMenu = async (restaurantId, _branchId) => {
     restaurant: restaurantId,
     isAvailable: true,
   })
-    .select('name description price category image tags allergens preparationTime isAvailable')
+    .select('name description price category imageUrl tags allergens preparationTime isAvailable')
     .sort('category name')
     .lean();
 
-  const grouped = items.reduce((acc, item) => {
+  const publicItems = items.map((item) => ({
+    _id: item._id,
+    name: item.name,
+    description: item.description,
+    price: item.price,
+    category: item.category,
+    imageUrl: item.imageUrl || '',
+    tags: item.tags,
+    allergens: item.allergens,
+    preparationTime: item.preparationTime,
+    isAvailable: item.isAvailable,
+  }));
+
+  const grouped = publicItems.reduce((acc, item) => {
     if (!acc[item.category]) acc[item.category] = [];
     acc[item.category].push(item);
     return acc;
   }, {});
 
-  return { items, grouped, total: items.length };
+  return { items: publicItems, grouped, total: publicItems.length };
 };
 
 // ─── Create customer order ────────────────────────────────────────────────────
@@ -239,7 +282,10 @@ export const createCustomerOrder = async ({
 
     // ── 9. Emit socket events ────────────────────────────────────────────────
     const io = getIO();
-    emitCustomerOrderEvent(io, order, EVENTS.ORDER_CREATED);
+    emitCustomerOrderEvent(io, {
+      ...order.toObject(),
+      table: { _id: table._id, number: table.number, location: table.location },
+    }, EVENTS.ORDER_CREATED);
     emitTableEvent(io, {
       _id: table._id,
       number: table.number,
@@ -270,7 +316,7 @@ export const getOrderStatus = async (orderId) => {
   assertObjectId(orderId, 'orderId');
 
   const order = await Order.findById(orderId)
-    .select('orderNumber status paymentStatus kotNumber totalAmount createdAt items source')
+    .select('orderNumber status paymentStatus billStatus kotNumber totalAmount createdAt items source')
     .populate('table', 'number')
     .populate('items.menuItem', 'preparationTime') // only prep time — no cost/recipe fields
     .lean();
@@ -307,6 +353,7 @@ export const getOrderStatus = async (orderId) => {
     kotNumber: order.kotNumber,
     status: order.status,
     paymentStatus: order.paymentStatus,
+    billStatus: order.billStatus,
     totalAmount: order.totalAmount,
     tableNumber: order.table?.number,
     source: order.source,
@@ -322,6 +369,95 @@ export const getOrderStatus = async (orderId) => {
   };
 };
 
+// ─── Public bill ─────────────────────────────────────────────────────────────
+
+export const getPublicBill = async (orderId) => {
+  assertObjectId(orderId, 'orderId');
+
+  const order = await Order.findById(orderId)
+    .select('orderNumber table customerName customerPhone items subtotal taxAmount discountAmount totalAmount status paymentStatus billStatus')
+    .populate('table', 'number')
+    .lean();
+
+  if (!order) throw Object.assign(new Error('Order not found'), { status: 404 });
+  return publicBillPayload(order);
+};
+
+export const requestBillForOrder = async (orderId) => {
+  assertObjectId(orderId, 'orderId');
+
+  const order = await Order.findById(orderId)
+    .select('orderNumber table branch status paymentStatus billStatus customerName customerPhone customerNote')
+    .populate('table', 'number')
+    .lean();
+
+  if (!order) throw Object.assign(new Error('Order not found'), { status: 404 });
+  if (['paid', 'cancelled'].includes(order.status)) {
+    throw Object.assign(new Error('Order is already closed'), { status: 422 });
+  }
+
+  await Order.findByIdAndUpdate(orderId, { billStatus: 'requested' });
+
+  const payload = {
+    orderId: order._id,
+    orderNumber: order.orderNumber,
+    tableNumber: order.table?.number,
+    customerName: order.customerName,
+    customerPhone: order.customerPhone,
+    customerNote: order.customerNote,
+    message: `Table ${order.table?.number || '?'} requested bill`,
+    createdAt: new Date(),
+  };
+
+  emitBillEvent(getIO(), order, EVENTS.CUSTOMER_REQUEST_BILL, payload);
+  return { success: true, billStatus: 'requested' };
+};
+
+export const getReceiptPdf = async (orderId) => {
+  const bill = await getPublicBill(orderId);
+  if (bill.paymentStatus !== 'paid') {
+    throw Object.assign(new Error('Receipt is available after payment'), { status: 403 });
+  }
+
+  const lines = [
+    'Restaurant Receipt',
+    `Order: ${bill.orderNumber}`,
+    `Table: ${bill.tableNumber || '-'}`,
+    bill.customerName ? `Customer: ${bill.customerName}` : null,
+    '',
+    ...bill.items.map((i) => `${i.name} x${i.quantity}  $${i.lineTotal.toFixed(2)}`),
+    '',
+    `Subtotal: $${bill.subtotal.toFixed(2)}`,
+    `Discount: $${bill.discount.toFixed(2)}`,
+    `Tax: $${bill.tax.toFixed(2)}`,
+    `Service charge: $${bill.serviceCharge.toFixed(2)}`,
+    `Total: $${bill.totalAmount.toFixed(2)}`,
+    'Payment completed',
+  ].filter((line) => line !== null);
+
+  const content = lines.map((line, i) => `BT /F1 12 Tf 50 ${760 - i * 18} Td (${String(line).replace(/[()\\]/g, '\\$&')}) Tj ET`).join('\n');
+  const objects = [
+    '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj',
+    '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj',
+    '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj',
+    '4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj',
+    `5 0 obj << /Length ${content.length} >> stream\n${content}\nendstream endobj`,
+  ];
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  for (const obj of objects) {
+    offsets.push(pdf.length);
+    pdf += `${obj}\n`;
+  }
+  const xref = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => {
+    pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
+  });
+  pdf += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return Buffer.from(pdf);
+};
+
 // ─── Call waiter ──────────────────────────────────────────────────────────────
 
 /**
@@ -331,7 +467,7 @@ export const callWaiterForOrder = async (orderId) => {
   assertObjectId(orderId, 'orderId');
 
   const order = await Order.findById(orderId)
-    .select('orderNumber table branch restaurant status')
+    .select('orderNumber table branch restaurant status customerName customerPhone customerNote')
     .populate('table', 'number')
     .lean();
 
@@ -346,10 +482,15 @@ export const callWaiterForOrder = async (orderId) => {
       orderId: order._id,
       orderNumber: order.orderNumber,
       tableNumber: order.table?.number,
-      at: new Date(),
+      customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      customerNote: order.customerNote,
+      message: `Table ${order.table?.number || '?'} is calling waiter`,
+      createdAt: new Date(),
     };
-    // Emit to POS room (waiters) and branch room if available
+    // Emit to POS/KDS rooms and branch room if available
     io.to('pos').emit(EVENTS.CUSTOMER_CALL_WAITER, payload);
+    io.to('kitchen').emit(EVENTS.CUSTOMER_CALL_WAITER, payload);
     if (order.branch) {
       io.to(`branch:${order.branch}`).emit(EVENTS.CUSTOMER_CALL_WAITER, payload);
     }

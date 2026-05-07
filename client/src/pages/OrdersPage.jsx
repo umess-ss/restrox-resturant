@@ -6,10 +6,13 @@ import {
   updateOrderStatus,
   printKOT,
   fetchBill,
+  markBillPresented,
   checkoutOrder,
   cancelOrder,
 } from '../api/orders.api.js';
 import { useSocketContext, useOrderEvents } from '../socket/SocketContext.jsx';
+import { EVENTS } from '../socket/events.js';
+import useNotificationSound from '../hooks/useNotificationSound.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -29,6 +32,28 @@ const NEXT_STATUS = {
 };
 
 const PAYMENT_METHODS = ['cash', 'card', 'upi', 'wallet', 'complimentary'];
+
+const BILL_STATUS_LABELS = {
+  not_requested: 'Bill not requested',
+  requested: 'Bill requested',
+  presented: 'Bill presented',
+  paid: 'Bill paid',
+};
+
+const getTableNumber = (order) => order.table?.number || order.tableNumber || '?';
+
+function CustomerInfo({ order }) {
+  if (order.source !== 'customer_qr') return null;
+  if (!order.customerName && !order.customerPhone && !order.customerNote) return null;
+
+  return (
+    <div className="mt-2 rounded-lg bg-orange-50 border border-orange-100 px-3 py-2 text-xs text-gray-700 space-y-0.5">
+      {order.customerName && <p><span className="font-semibold">Customer:</span> {order.customerName}</p>}
+      {order.customerPhone && <p><span className="font-semibold">Phone:</span> {order.customerPhone}</p>}
+      {order.customerNote && <p><span className="font-semibold">Note:</span> {order.customerNote}</p>}
+    </div>
+  );
+}
 
 // ─── Bill / Checkout Modal ────────────────────────────────────────────────────
 
@@ -170,16 +195,17 @@ function BillModal({ orderId, onClose, onPaid }) {
 
 // ─── KOT Card ─────────────────────────────────────────────────────────────────
 
-function KOTCard({ order, onAdvance }) {
+function KOTCard({ order, onAdvance, highlighted }) {
   const elapsed = Math.floor((Date.now() - new Date(order.createdAt)) / 60000);
   const urgent = elapsed > 20;
 
   return (
-    <div className={`bg-white rounded-xl border-2 p-4 space-y-3 ${urgent ? 'border-red-300' : 'border-gray-200'}`}>
+    <div className={`bg-white rounded-xl border-2 p-4 space-y-3 transition-all ${urgent ? 'border-red-300' : 'border-gray-200'} ${highlighted ? 'ring-4 ring-orange-300' : ''}`}>
       <div className="flex justify-between items-start">
         <div>
           <p className="font-bold text-gray-800">{order.kotNumber}</p>
           <p className="text-xs text-gray-500">Table {order.table?.number} · {order.waiter?.name}</p>
+          <CustomerInfo order={order} />
         </div>
         <div className="text-right">
           <span className={`text-xs font-semibold ${urgent ? 'text-red-600' : 'text-gray-500'}`}>
@@ -212,9 +238,9 @@ function KOTCard({ order, onAdvance }) {
 
 // ─── Order Row ────────────────────────────────────────────────────────────────
 
-function OrderRow({ order, onAdvance, onBill, onCancel, onKOT }) {
+function OrderRow({ order, onAdvance, onBill, onCancel, onKOT, onBillPresented, highlighted }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+    <div className={`bg-white rounded-xl border border-gray-100 shadow-sm p-4 transition-all ${highlighted ? 'ring-4 ring-orange-300' : ''}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -225,11 +251,17 @@ function OrderRow({ order, onAdvance, onBill, onCancel, onKOT }) {
             {order.paymentStatus === 'paid' && (
               <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Paid</span>
             )}
+            {order.source === 'customer_qr' && (
+              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                {BILL_STATUS_LABELS[order.billStatus] || 'Bill not requested'}
+              </span>
+            )}
           </div>
           <p className="text-sm text-gray-500 mt-0.5">
             Table {order.table?.number} · {order.items?.length} item(s) · ${order.totalAmount?.toFixed(2)}
           </p>
           <p className="text-xs text-gray-400">{order.waiter?.name} · {new Date(order.createdAt).toLocaleTimeString()}</p>
+          <CustomerInfo order={order} />
         </div>
 
         <div className="flex gap-1.5 flex-wrap justify-end">
@@ -244,6 +276,12 @@ function OrderRow({ order, onAdvance, onBill, onCancel, onKOT }) {
               onClick={() => onKOT(order._id)}
               className="text-xs border border-orange-300 text-orange-600 px-2.5 py-1.5 rounded-lg hover:bg-orange-50"
             >🖨 KOT</button>
+          )}
+          {order.source === 'customer_qr' && order.billStatus === 'requested' && (
+            <button
+              onClick={() => onBillPresented(order._id)}
+              className="text-xs bg-blue-500 text-white px-2.5 py-1.5 rounded-lg hover:bg-blue-600"
+            >Mark Bill Presented</button>
           )}
           {['served', 'ready'].includes(order.status) && order.paymentStatus !== 'paid' && (
             <button
@@ -271,7 +309,10 @@ export default function OrdersPage() {
   const [view, setView] = useState('orders'); // 'orders' | 'kitchen'
   const [statusFilter, setStatusFilter] = useState('');
   const [billOrderId, setBillOrderId] = useState(null);
-  const { connected } = useSocketContext();
+  const [newOrderNotice, setNewOrderNotice] = useState('');
+  const [highlightedOrderId, setHighlightedOrderId] = useState(null);
+  const { connected, socket } = useSocketContext();
+  const playNotificationSound = useNotificationSound();
 
   const load = useCallback(async () => {
     try {
@@ -294,8 +335,64 @@ export default function OrdersPage() {
     return () => clearInterval(t);
   }, [load]);
 
+  const notifyNewQrOrder = useCallback((order) => {
+    const details = [order.customerName, order.customerPhone].filter(Boolean).join(' · ');
+    const message = details
+      ? `New QR order from Table ${getTableNumber(order)} — ${details}`
+      : `New QR order from Table ${getTableNumber(order)}`;
+    setNewOrderNotice(message);
+    setHighlightedOrderId(order._id);
+    toast.info(message);
+    playNotificationSound();
+    setTimeout(() => setNewOrderNotice(''), 5000);
+    setTimeout(() => setHighlightedOrderId(null), 6000);
+  }, [playNotificationSound]);
+
+  const notifyWaiterCall = useCallback((payload) => {
+    const details = [payload.customerName, payload.customerPhone].filter(Boolean).join(' · ');
+    const message = details
+      ? `Table ${payload.tableNumber || '?'} is calling waiter — ${details}`
+      : `Table ${payload.tableNumber || '?'} is calling waiter`;
+    setNewOrderNotice(message);
+    setHighlightedOrderId(payload.orderId);
+    toast.info(message);
+    playNotificationSound();
+    setTimeout(() => setNewOrderNotice(''), 5000);
+    setTimeout(() => setHighlightedOrderId(null), 6000);
+  }, [playNotificationSound]);
+
+  const notifyBillRequest = useCallback((payload) => {
+    const details = [payload.customerName, payload.customerPhone].filter(Boolean).join(' · ');
+    const message = details
+      ? `Table ${payload.tableNumber || '?'} requested bill — ${details}`
+      : `Table ${payload.tableNumber || '?'} requested bill`;
+    setNewOrderNotice(message);
+    setHighlightedOrderId(payload.orderId);
+    toast.info(message);
+    playNotificationSound();
+    setTimeout(() => setNewOrderNotice(''), 5000);
+    setTimeout(() => setHighlightedOrderId(null), 6000);
+  }, [playNotificationSound]);
+
+  useEffect(() => {
+    if (!socket) return;
+    socket.on(EVENTS.CUSTOMER_CALL_WAITER, notifyWaiterCall);
+    socket.on(EVENTS.CUSTOMER_REQUEST_BILL, notifyBillRequest);
+    socket.on('waiter:called', notifyWaiterCall);
+    return () => {
+      socket.off(EVENTS.CUSTOMER_CALL_WAITER, notifyWaiterCall);
+      socket.off(EVENTS.CUSTOMER_REQUEST_BILL, notifyBillRequest);
+      socket.off('waiter:called', notifyWaiterCall);
+    };
+  }, [socket, notifyWaiterCall, notifyBillRequest]);
+
   // Real-time updates — reload list on any order event
-  useOrderEvents(() => { load(); }, [load]);
+  useOrderEvents((event, payload) => {
+    if (event === EVENTS.ORDER_CREATED && payload.source === 'customer_qr') {
+      notifyNewQrOrder(payload);
+    }
+    load();
+  }, [load, notifyNewQrOrder]);
 
   const advance = async (id, current) => {
     try {
@@ -314,6 +411,16 @@ export default function OrdersPage() {
       load();
     } catch (err) {
       toast.error(err.response?.data?.message || 'KOT failed');
+    }
+  };
+
+  const presentBill = async (id) => {
+    try {
+      await markBillPresented(id);
+      toast.success('Bill marked presented');
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update bill');
     }
   };
 
@@ -351,6 +458,13 @@ export default function OrdersPage() {
           >👨‍🍳 Kitchen {kitchenOrders.length > 0 && <span className="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5">{kitchenOrders.length}</span>}</button>
         </div>
       </div>
+
+      {newOrderNotice && (
+        <div className="bg-orange-50 border border-orange-200 text-orange-800 rounded-xl px-4 py-2 text-sm font-semibold">
+          {newOrderNotice}
+        </div>
+      )}
+
       {view === 'orders' && (
         <>
           {/* Status filter */}
@@ -374,6 +488,8 @@ export default function OrdersPage() {
                 onBill={setBillOrderId}
                 onCancel={cancel}
                 onKOT={sendKOT}
+                onBillPresented={presentBill}
+                highlighted={highlightedOrderId === order._id}
               />
             ))}
             {orders.length === 0 && (
@@ -389,7 +505,12 @@ export default function OrdersPage() {
             <div className="col-span-3 text-center py-12 text-gray-400">No active kitchen orders</div>
           )}
           {kitchenOrders.map((order) => (
-            <KOTCard key={order._id} order={order} onAdvance={advance} />
+            <KOTCard
+              key={order._id}
+              order={order}
+              onAdvance={advance}
+              highlighted={highlightedOrderId === order._id}
+            />
           ))}
         </div>
       )}

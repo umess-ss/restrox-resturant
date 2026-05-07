@@ -177,6 +177,7 @@ export const transitionStatus = async (orderId, newStatus, userId, note) => {
   if (newStatus === 'paid') {
     order.paidAt = new Date();
     order.paymentStatus = 'paid';
+    order.billStatus = 'paid';
   }
 
   await order.save();

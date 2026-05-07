@@ -12,6 +12,31 @@ const CAT_ICONS = {
 
 const fmt = (n) => Number(n).toFixed(2);
 
+const itemImageUrl = (item) => item?.imageUrl || item?.image || '';
+
+function MenuItemImage({ item }) {
+  const [failed, setFailed] = useState(false);
+  const src = itemImageUrl(item);
+
+  if (!src || failed) {
+    return (
+      <div className="w-20 h-20 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-300 shrink-0 sm:w-24 sm:h-24">
+        <span className="text-lg">🍽️</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={item.name}
+      onError={() => setFailed(true)}
+      className="w-20 h-20 rounded-xl object-cover shrink-0 sm:w-24 sm:h-24"
+      loading="lazy"
+    />
+  );
+}
+
 // ─── Item notes modal ─────────────────────────────────────────────────────────
 
 function NotesModal({ item, current, onSave, onClose }) {
@@ -316,13 +341,7 @@ export default function CustomerTablePage() {
               key={item._id}
               className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-start gap-3"
             >
-              {item.image && (
-                <img
-                  src={item.image}
-                  alt={item.name}
-                  className="w-16 h-16 rounded-xl object-cover shrink-0"
-                />
-              )}
+              <MenuItemImage item={item} />
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-gray-800 text-sm">{item.name}</p>
                 {item.description && (

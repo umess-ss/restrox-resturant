@@ -34,6 +34,7 @@ const itemValidation = [
   body('category')
     .isIn(['appetizer', 'main', 'dessert', 'beverage', 'special'])
     .withMessage('Invalid category'),
+  body('imageUrl').optional({ values: 'falsy' }).isURL().withMessage('Image URL must be valid'),
   // Optional recipe inline
   body('recipe').optional().isArray({ min: 1 }).withMessage('Recipe must be a non-empty array'),
   body('recipe.*.ingredient').optional().isMongoId().withMessage('Invalid ingredient ID'),

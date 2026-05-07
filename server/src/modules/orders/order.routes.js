@@ -6,6 +6,7 @@ import validate from '../../middlewares/validate.middleware.js';
 import {
   getOrders, getOrder, getKitchenOrders, createOrder, addItems,
   updateOrderStatus, printKOT, getBill, checkoutOrder, cancelOrder, updateItemStatus,
+  markBillPresented,
 } from './order.controller.js';
 
 const router = Router();
@@ -56,6 +57,8 @@ router.patch(
 router.post('/:id/kot', can('orders:write'), printKOT);
 
 router.get('/:id/bill', can('orders:read'), getBill);
+
+router.patch('/:id/bill-presented', can('orders:write'), markBillPresented);
 
 router.post(
   '/:id/checkout',

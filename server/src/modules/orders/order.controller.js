@@ -1,4 +1,6 @@
 import Order from './order.model.js';
+import { getIO } from '../../socket/io.js';
+import { EVENTS, ROOMS } from '../../socket/events.js';
 import {
   createOrder as svcCreate,
   addItemsToOrder,
@@ -53,7 +55,10 @@ export const getOrder = async (req, res) => {
 export const getKitchenOrders = async (req, res) => {
   const orders = await Order.find({
     ...req.branchFilter,
-    status: { $in: ['confirmed', 'preparing', 'ready'] },
+    $or: [
+      { status: { $in: ['confirmed', 'preparing', 'ready'] } },
+      { status: 'pending', source: 'customer_qr' },
+    ],
   })
     .populate('table', 'number location')
     .populate('waiter', 'name')
@@ -106,6 +111,36 @@ export const getBill = async (req, res) => {
     discountValue: discountValue ? Number(discountValue) : 0,
   });
   res.json(bill);
+};
+
+export const markBillPresented = async (req, res) => {
+  const order = await Order.findOneAndUpdate(
+    { _id: req.params.id, ...req.tenantFilter },
+    { billStatus: 'presented', billGeneratedAt: new Date() },
+    { new: true }
+  )
+    .populate('table', 'number location')
+    .populate('waiter', 'name');
+
+  if (!order) return res.status(404).json({ message: 'Order not found' });
+
+  const payload = {
+    orderId: order._id,
+    orderNumber: order.orderNumber,
+    tableNumber: order.table?.number,
+    billStatus: order.billStatus,
+    message: `Bill presented for Table ${order.table?.number || '?'}`,
+    createdAt: new Date(),
+  };
+
+  const io = getIO();
+  if (io) {
+    io.to(ROOMS.order(order._id)).emit(EVENTS.BILL_PRESENTED, payload);
+    io.to(ROOMS.pos).emit(EVENTS.BILL_PRESENTED, payload);
+    io.to(ROOMS.kitchen).emit(EVENTS.BILL_PRESENTED, payload);
+  }
+
+  res.json({ order });
 };
 
 // ─── Checkout ─────────────────────────────────────────────────────────────────

@@ -33,6 +33,8 @@ export const EVENTS = Object.freeze({
 
   // ─── Customer QR ─────────────────────────────────────────────────────────
   CUSTOMER_CALL_WAITER:     'customer:call_waiter',      // → pos room
+  CUSTOMER_REQUEST_BILL:    'customer:request_bill',
+  BILL_PRESENTED:           'bill:presented',
 
   // ─── Client → Server ─────────────────────────────────────────────────────
   CLIENT_JOIN_ORDER:        'client:join_order',

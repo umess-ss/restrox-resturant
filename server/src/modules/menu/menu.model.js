@@ -11,7 +11,7 @@ const menuItemSchema = new mongoose.Schema(
       enum: ['appetizer', 'main', 'dessert', 'beverage', 'special'],
       required: true,
     },
-    image: { type: String },
+    imageUrl: { type: String },
     isAvailable: { type: Boolean, default: true },
     preparationTime: { type: Number, default: 15 }, // minutes
 

@@ -10,6 +10,9 @@ import {
   createCustomerOrder,
   getOrderStatus,
   callWaiterForOrder,
+  getPublicBill,
+  requestBillForOrder,
+  getReceiptPdf,
 } from './public.service.js';
 
 // ─── GET /api/public/restaurants/:restaurantId/branches/:branchId/tables/:tableId
@@ -70,6 +73,29 @@ export const placeOrder = async (req, res) => {
 export const getStatus = async (req, res) => {
   const data = await getOrderStatus(req.params.orderId);
   res.json(data);
+};
+
+// ─── GET /api/public/orders/:orderId/bill
+
+export const getBill = async (req, res) => {
+  const data = await getPublicBill(req.params.orderId);
+  res.json(data);
+};
+
+// ─── POST /api/public/orders/:orderId/request-bill
+
+export const requestBill = async (req, res) => {
+  const result = await requestBillForOrder(req.params.orderId);
+  res.json(result);
+};
+
+// ─── GET /api/public/orders/:orderId/receipt/pdf
+
+export const receiptPdf = async (req, res) => {
+  const pdf = await getReceiptPdf(req.params.orderId);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="receipt-${req.params.orderId}.pdf"`);
+  res.send(pdf);
 };
 
 // ─── POST /api/public/orders/:orderId/call-waiter

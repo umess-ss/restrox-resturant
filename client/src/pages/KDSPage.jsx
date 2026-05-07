@@ -3,6 +3,7 @@ import { toast } from 'react-toastify';
 import { fetchKitchenOrders, updateItemStatus, updateOrderStatus } from '../api/orders.api.js';
 import { useSocketContext, useOrderEvents } from '../socket/SocketContext.jsx';
 import { EVENTS } from '../socket/events.js';
+import useNotificationSound from '../hooks/useNotificationSound.js';
 
 // ─── Aging helpers ────────────────────────────────────────────────────────────
 
@@ -15,10 +16,28 @@ const getAgingStyle = (seconds) => {
 };
 
 const formatElapsed = (seconds) => {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
+  const totalMinutes = Math.floor(seconds / 60);
+  if (totalMinutes < 60) return `${totalMinutes} min`;
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}h ${minutes}m`;
 };
+
+const getTableNumber = (order) => order.table?.number || order.tableNumber || '?';
+
+function CustomerInfo({ order }) {
+  if (order.source !== 'customer_qr') return null;
+  if (!order.customerName && !order.customerPhone && !order.customerNote) return null;
+
+  return (
+    <div className="mt-2 rounded-lg bg-white/60 border border-black/10 px-3 py-2 text-xs text-gray-700 space-y-0.5">
+      {order.customerName && <p><span className="font-semibold">Customer:</span> {order.customerName}</p>}
+      {order.customerPhone && <p><span className="font-semibold">Phone:</span> {order.customerPhone}</p>}
+      {order.customerNote && <p><span className="font-semibold">Note:</span> {order.customerNote}</p>}
+    </div>
+  );
+}
 
 // ─── Item status button ───────────────────────────────────────────────────────
 
@@ -77,7 +96,7 @@ function ItemRow({ item, orderId, onUpdate }) {
 
 // ─── KDS Order Card ───────────────────────────────────────────────────────────
 
-function KDSCard({ order, onUpdate }) {
+function KDSCard({ order, onUpdate, highlighted }) {
   const [elapsed, setElapsed] = useState(getElapsed(order.createdAt));
   const aging = getAgingStyle(elapsed);
 
@@ -110,7 +129,7 @@ function KDSCard({ order, onUpdate }) {
   };
 
   return (
-    <div className={`rounded-2xl border-2 flex flex-col overflow-hidden shadow-sm transition-all ${aging.card}`}>
+    <div className={`rounded-2xl border-2 flex flex-col overflow-hidden shadow-sm transition-all ${aging.card} ${highlighted ? 'ring-4 ring-orange-300' : ''}`}>
       {/* Card header */}
       <div className="px-4 py-3 flex items-start justify-between gap-2 border-b border-black/10">
         <div>
@@ -123,12 +142,13 @@ function KDSCard({ order, onUpdate }) {
             {order.table?.location && <span className="text-gray-400"> · {order.table.location}</span>}
           </p>
           {order.waiter?.name && <p className="text-xs text-gray-400">{order.waiter.name}</p>}
+          <CustomerInfo order={order} />
         </div>
 
         <div className="text-right shrink-0">
           {/* Aging timer */}
           <div className={`text-sm font-mono font-bold px-2 py-0.5 rounded-lg ${aging.badge}`}>
-            ⏱ {formatElapsed(elapsed)}
+            Waiting {formatElapsed(elapsed)}
           </div>
           <div className="text-xs text-gray-500 mt-1 capitalize">{order.status}</div>
         </div>
@@ -167,7 +187,7 @@ function KDSCard({ order, onUpdate }) {
 
 // ─── Status column ────────────────────────────────────────────────────────────
 
-function Column({ title, color, orders, onUpdate }) {
+function Column({ title, color, orders, onUpdate, highlightedOrderId }) {
   return (
     <div className="flex flex-col min-w-0">
       <div className={`flex items-center gap-2 mb-3 px-1`}>
@@ -181,7 +201,14 @@ function Column({ title, color, orders, onUpdate }) {
             No orders
           </div>
         )}
-        {orders.map((o) => <KDSCard key={o._id} order={o} onUpdate={onUpdate} />)}
+        {orders.map((o) => (
+          <KDSCard
+            key={o._id}
+            order={o}
+            onUpdate={onUpdate}
+            highlighted={highlightedOrderId === o._id}
+          />
+        ))}
       </div>
     </div>
   );
@@ -192,7 +219,10 @@ function Column({ title, color, orders, onUpdate }) {
 export default function KDSPage() {
   const [orders, setOrders] = useState([]);
   const [lastUpdate, setLastUpdate] = useState(null);
-  const { connected } = useSocketContext();
+  const [newOrderNotice, setNewOrderNotice] = useState('');
+  const [highlightedOrderId, setHighlightedOrderId] = useState(null);
+  const { connected, socket } = useSocketContext();
+  const playNotificationSound = useNotificationSound();
   const loadRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -210,9 +240,64 @@ export default function KDSPage() {
   useEffect(() => { load(); }, [load]);
 
   // Real-time order updates via shared socket context
+  const notifyNewQrOrder = useCallback((order) => {
+    const details = [order.customerName, order.customerPhone].filter(Boolean).join(' · ');
+    const message = details
+      ? `New QR order from Table ${getTableNumber(order)} — ${details}`
+      : `New QR order from Table ${getTableNumber(order)}`;
+    setNewOrderNotice(message);
+    setHighlightedOrderId(order._id);
+    toast.info(message);
+    playNotificationSound();
+    setTimeout(() => setNewOrderNotice(''), 5000);
+    setTimeout(() => setHighlightedOrderId(null), 6000);
+  }, [playNotificationSound]);
+
+  const notifyWaiterCall = useCallback((payload) => {
+    const details = [payload.customerName, payload.customerPhone].filter(Boolean).join(' · ');
+    const message = details
+      ? `Table ${payload.tableNumber || '?'} is calling waiter — ${details}`
+      : `Table ${payload.tableNumber || '?'} is calling waiter`;
+    setNewOrderNotice(message);
+    setHighlightedOrderId(payload.orderId);
+    toast.info(message);
+    playNotificationSound();
+    setTimeout(() => setNewOrderNotice(''), 5000);
+    setTimeout(() => setHighlightedOrderId(null), 6000);
+  }, [playNotificationSound]);
+
+  const notifyBillRequest = useCallback((payload) => {
+    const details = [payload.customerName, payload.customerPhone].filter(Boolean).join(' · ');
+    const message = details
+      ? `Table ${payload.tableNumber || '?'} requested bill — ${details}`
+      : `Table ${payload.tableNumber || '?'} requested bill`;
+    setNewOrderNotice(message);
+    setHighlightedOrderId(payload.orderId);
+    toast.info(message);
+    playNotificationSound();
+    setTimeout(() => setNewOrderNotice(''), 5000);
+    setTimeout(() => setHighlightedOrderId(null), 6000);
+  }, [playNotificationSound]);
+
+  useEffect(() => {
+    if (!socket) return;
+    socket.on(EVENTS.CUSTOMER_CALL_WAITER, notifyWaiterCall);
+    socket.on(EVENTS.CUSTOMER_REQUEST_BILL, notifyBillRequest);
+    socket.on('waiter:called', notifyWaiterCall);
+    return () => {
+      socket.off(EVENTS.CUSTOMER_CALL_WAITER, notifyWaiterCall);
+      socket.off(EVENTS.CUSTOMER_REQUEST_BILL, notifyBillRequest);
+      socket.off('waiter:called', notifyWaiterCall);
+    };
+  }, [socket, notifyWaiterCall, notifyBillRequest]);
+
   useOrderEvents((event, updatedOrder) => {
+    if (event === EVENTS.ORDER_CREATED && updatedOrder.source === 'customer_qr') {
+      notifyNewQrOrder(updatedOrder);
+    }
+
     setOrders((prev) => {
-      const kitchenStatuses = ['confirmed', 'preparing', 'ready'];
+      const kitchenStatuses = ['pending', 'confirmed', 'preparing', 'ready'];
 
       if (!kitchenStatuses.includes(updatedOrder.status)) {
         return prev.filter((o) => o._id !== updatedOrder._id);
@@ -225,9 +310,9 @@ export default function KDSPage() {
       return [...prev, updatedOrder].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
     });
     setLastUpdate(new Date());
-  }, []);
+  }, [notifyNewQrOrder]);
 
-  const confirmed = orders.filter((o) => o.status === 'confirmed');
+  const newOrders = orders.filter((o) => ['pending', 'confirmed'].includes(o.status));
   const preparing = orders.filter((o) => o.status === 'preparing');
   const ready     = orders.filter((o) => o.status === 'ready');
 
@@ -252,11 +337,17 @@ export default function KDSPage() {
         </div>
       </div>
 
+      {newOrderNotice && (
+        <div className="bg-orange-100 border-b border-orange-200 text-orange-800 px-6 py-2 text-sm font-semibold">
+          {newOrderNotice}
+        </div>
+      )}
+
       {/* Columns */}
       <div className="flex-1 overflow-hidden grid grid-cols-3 gap-4 p-4">
-        <Column title="New Orders"  color="bg-blue-500"   orders={confirmed} onUpdate={load} />
-        <Column title="Preparing"   color="bg-orange-500" orders={preparing} onUpdate={load} />
-        <Column title="Ready"       color="bg-green-500"  orders={ready}     onUpdate={load} />
+        <Column title="New Orders"  color="bg-blue-500"   orders={newOrders} onUpdate={load} highlightedOrderId={highlightedOrderId} />
+        <Column title="Preparing"   color="bg-orange-500" orders={preparing} onUpdate={load} highlightedOrderId={highlightedOrderId} />
+        <Column title="Ready"       color="bg-green-500"  orders={ready}     onUpdate={load} highlightedOrderId={highlightedOrderId} />
       </div>
     </div>
   );

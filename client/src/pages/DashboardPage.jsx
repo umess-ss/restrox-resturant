@@ -11,7 +11,9 @@ import {
   fetchStaffPerformance, fetchPaymentMethods,
 } from '../api/analytics.api.js';
 import useAuthStore from '../store/authStore.js';
-import { useAnalyticsEvents } from '../socket/SocketContext.jsx';
+import { useAnalyticsEvents, useSocketContext } from '../socket/SocketContext.jsx';
+import { EVENTS } from '../socket/events.js';
+import useNotificationSound from '../hooks/useNotificationSound.js';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 
@@ -42,6 +44,7 @@ const Delta = ({ value }) => {
 };
 
 const fmt = (n) => n?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—';
+const getTableNumber = (order) => order.table?.number || order.tableNumber || '?';
 
 // ─── KPI Cards ────────────────────────────────────────────────────────────────
 
@@ -377,8 +380,11 @@ export default function DashboardPage() {
   const [snapshot, setSnapshot] = useState(null);
   const [staffData, setStaffData] = useState(null);
   const [payrollData, setPayrollData] = useState(null);
+  const [newOrderNotice, setNewOrderNotice] = useState('');
   const user = useAuthStore((s) => s.user);
   const isManager = ['admin', 'manager'].includes(user?.role);
+  const { socket } = useSocketContext();
+  const playNotificationSound = useNotificationSound();
 
   const load = useCallback(async () => {
     try {
@@ -399,6 +405,58 @@ export default function DashboardPage() {
 
   // Live dashboard refresh when an order is paid
   useAnalyticsEvents(() => { load(); }, [load]);
+
+  const notifyNewQrOrder = useCallback((order) => {
+    const details = [order.customerName, order.customerPhone].filter(Boolean).join(' · ');
+    const message = details
+      ? `New QR order from Table ${getTableNumber(order)} — ${details}`
+      : `New QR order from Table ${getTableNumber(order)}`;
+    setNewOrderNotice(message);
+    toast.info(message);
+    playNotificationSound();
+    setTimeout(() => setNewOrderNotice(''), 5000);
+  }, [playNotificationSound]);
+
+  const notifyWaiterCall = useCallback((payload) => {
+    const details = [payload.customerName, payload.customerPhone].filter(Boolean).join(' · ');
+    const message = details
+      ? `Table ${payload.tableNumber || '?'} is calling waiter — ${details}`
+      : `Table ${payload.tableNumber || '?'} is calling waiter`;
+    setNewOrderNotice(message);
+    toast.info(message);
+    playNotificationSound();
+    setTimeout(() => setNewOrderNotice(''), 5000);
+  }, [playNotificationSound]);
+
+  const notifyBillRequest = useCallback((payload) => {
+    const details = [payload.customerName, payload.customerPhone].filter(Boolean).join(' · ');
+    const message = details
+      ? `Table ${payload.tableNumber || '?'} requested bill — ${details}`
+      : `Table ${payload.tableNumber || '?'} requested bill`;
+    setNewOrderNotice(message);
+    toast.info(message);
+    playNotificationSound();
+    setTimeout(() => setNewOrderNotice(''), 5000);
+  }, [playNotificationSound]);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleOrderCreated = (order) => {
+      if (order.source === 'customer_qr') notifyNewQrOrder(order);
+    };
+
+    socket.on(EVENTS.ORDER_CREATED, handleOrderCreated);
+    socket.on(EVENTS.CUSTOMER_CALL_WAITER, notifyWaiterCall);
+    socket.on(EVENTS.CUSTOMER_REQUEST_BILL, notifyBillRequest);
+    socket.on('waiter:called', notifyWaiterCall);
+    return () => {
+      socket.off(EVENTS.ORDER_CREATED, handleOrderCreated);
+      socket.off(EVENTS.CUSTOMER_CALL_WAITER, notifyWaiterCall);
+      socket.off(EVENTS.CUSTOMER_REQUEST_BILL, notifyBillRequest);
+      socket.off('waiter:called', notifyWaiterCall);
+    };
+  }, [socket, notifyNewQrOrder, notifyWaiterCall, notifyBillRequest]);
 
   // Non-manager: simple view
   if (!isManager) {
@@ -430,6 +488,12 @@ export default function DashboardPage() {
           ↻ Refresh
         </button>
       </div>
+
+      {newOrderNotice && (
+        <div className="bg-orange-50 border border-orange-200 text-orange-800 rounded-xl px-4 py-2 text-sm font-semibold">
+          {newOrderNotice}
+        </div>
+      )}
 
       {/* KPI row */}
       <KPICards overview={overview} />

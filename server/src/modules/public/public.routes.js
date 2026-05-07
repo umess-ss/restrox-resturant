@@ -14,6 +14,9 @@ import {
   placeOrder,
   getStatus,
   callWaiter,
+  getBill,
+  requestBill,
+  receiptPdf,
 } from './public.controller.js';
 
 const router = Router();
@@ -71,6 +74,11 @@ router.post(
 
 // ─── Order status polling ─────────────────────────────────────────────────────
 router.get('/orders/:orderId/status', getStatus);
+
+// ─── Public bill / receipt ───────────────────────────────────────────────────
+router.get('/orders/:orderId/bill', getBill);
+router.post('/orders/:orderId/request-bill', callWaiterLimiter, requestBill);
+router.get('/orders/:orderId/receipt/pdf', receiptPdf);
 
 // ─── Call waiter ──────────────────────────────────────────────────────────────
 router.post('/orders/:orderId/call-waiter', callWaiterLimiter, callWaiter);

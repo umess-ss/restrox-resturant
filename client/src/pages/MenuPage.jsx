@@ -24,8 +24,31 @@ const CATEGORY_COLORS = {
 
 const EMPTY_ITEM = {
   name: '', description: '', price: '', category: 'main',
-  preparationTime: 15, isAvailable: true, tags: '', overheadCost: 0,
+  imageUrl: '', preparationTime: 15, isAvailable: true, tags: '', overheadCost: 0,
 };
+
+const itemImageUrl = (item) => item?.imageUrl || item?.image || '';
+
+function MenuImage({ src, alt, className = '' }) {
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) {
+    return (
+      <div className={`bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-300 ${className}`}>
+        <span className="text-lg">🍽️</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      onError={() => setFailed(true)}
+      className={`object-cover ${className}`}
+    />
+  );
+}
 
 // ─── Margin badge ─────────────────────────────────────────────────────────────
 
@@ -199,7 +222,7 @@ function RecipeEditor({ item, ingredients, onClose, onSaved }) {
 function ItemFormModal({ item, onClose, onSaved }) {
   const [form, setForm] = useState(
     item
-      ? { ...item, tags: item.tags?.join(', ') || '' }
+      ? { ...item, imageUrl: itemImageUrl(item), tags: item.tags?.join(', ') || '' }
       : EMPTY_ITEM
   );
   const [loading, setLoading] = useState(false);
@@ -211,6 +234,7 @@ function ItemFormModal({ item, onClose, onSaved }) {
     setLoading(true);
     const payload = {
       ...form,
+      imageUrl: form.imageUrl?.trim() || '',
       price: Number(form.price),
       overheadCost: Number(form.overheadCost),
       preparationTime: Number(form.preparationTime),
@@ -282,6 +306,22 @@ function ItemFormModal({ item, onClose, onSaved }) {
         </div>
 
         {field('Tags (comma-separated)', 'tags')}
+
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Image URL</label>
+          <input
+            type="url"
+            value={form.imageUrl}
+            onChange={(e) => set('imageUrl', e.target.value)}
+            placeholder="https://example.com/menu-item.jpg"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+          />
+          <MenuImage
+            src={form.imageUrl}
+            alt={form.name || 'Menu item preview'}
+            className="mt-2 h-32 w-full rounded-lg"
+          />
+        </div>
 
         <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
           <input type="checkbox" checked={form.isAvailable} onChange={(e) => set('isAvailable', e.target.checked)} />
@@ -439,6 +479,12 @@ export default function MenuPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {displayed.map((item) => (
           <div key={item._id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-col gap-3">
+            <MenuImage
+              src={itemImageUrl(item)}
+              alt={item.name}
+              className="h-36 w-full rounded-lg"
+            />
+
             {/* Top row */}
             <div className="flex justify-between items-start gap-2">
               <div className="flex-1 min-w-0">

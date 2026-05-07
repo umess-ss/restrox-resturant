@@ -28,6 +28,15 @@ export const placePublicOrder = (data) =>
 export const fetchPublicOrderStatus = (orderId) =>
   pub.get(`/public/orders/${orderId}/status`).then((r) => r.data);
 
+export const fetchPublicBill = (orderId) =>
+  pub.get(`/public/orders/${orderId}/bill`).then((r) => r.data);
+
+export const requestPublicBill = (orderId) =>
+  pub.post(`/public/orders/${orderId}/request-bill`).then((r) => r.data);
+
+export const publicReceiptPdfUrl = (orderId) =>
+  `${BASE}/public/orders/${orderId}/receipt/pdf`;
+
 // ─── Call waiter ──────────────────────────────────────────────────────────────
 export const callPublicWaiter = (orderId) =>
   pub.post(`/public/orders/${orderId}/call-waiter`).then((r) => r.data);

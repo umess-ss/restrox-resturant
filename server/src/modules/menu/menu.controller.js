@@ -9,6 +9,8 @@ import {
 
 // ─── Menu Items ───────────────────────────────────────────────────────────────
 
+const normalizeMenuItemData = ({ imageUrl, ...data }) => ({ ...data, imageUrl });
+
 export const getMenuItems = async (req, res) => {
   const { category, available, tag, withRecipe } = req.query;
   const filter = {};
@@ -56,7 +58,7 @@ export const getMenuItem = async (req, res) => {
 export const createMenuItem = async (req, res) => {
   const { recipe: recipeIngredients, ...itemData } = req.body;
   const { item, recipe } = await createMenuItemWithRecipe(
-    itemData,
+    normalizeMenuItemData(itemData),
     recipeIngredients,
     req.user._id
   );
@@ -66,7 +68,7 @@ export const createMenuItem = async (req, res) => {
 export const updateMenuItem = async (req, res) => {
   const { recipe: recipeIngredients, ...itemData } = req.body;
 
-  const item = await MenuItem.findByIdAndUpdate(req.params.id, itemData, {
+  const item = await MenuItem.findByIdAndUpdate(req.params.id, normalizeMenuItemData(itemData), {
     new: true,
     runValidators: true,
   });

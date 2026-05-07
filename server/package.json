@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
-    "lint": "eslint src/**/*.js"
+    "lint": "eslint src/**/*.js",
+    "seed:menu-images": "node src/scripts/seedMenuImages.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
