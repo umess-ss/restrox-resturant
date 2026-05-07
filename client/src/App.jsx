@@ -8,6 +8,7 @@ import OrdersPage from './pages/OrdersPage.jsx';
 import TablesPage from './pages/TablesPage.jsx';
 import StaffPage from './pages/StaffPage.jsx';
 import InventoryPage from './pages/InventoryPage.jsx';
+import POSPage from './pages/POSPage.jsx';
 
 const PrivateRoute = ({ children }) => {
   const token = useAuthStore((s) => s.accessToken);
@@ -32,6 +33,7 @@ export default function App() {
         <Route path="tables" element={<TablesPage />} />
         <Route path="staff" element={<StaffPage />} />
         <Route path="inventory" element={<InventoryPage />} />
+        <Route path="pos" element={<POSPage />} />
       </Route>
     </Routes>
   );

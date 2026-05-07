@@ -1,28 +1,91 @@
 import mongoose from 'mongoose';
 
-const orderItemSchema = new mongoose.Schema({
-  menuItem: { type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem', required: true },
-  name: { type: String, required: true },
-  price: { type: Number, required: true },
-  quantity: { type: Number, required: true, min: 1 },
-  notes: { type: String },
-});
+// ─── Sub-schemas ──────────────────────────────────────────────────────────────
+
+const orderItemSchema = new mongoose.Schema(
+  {
+    menuItem: { type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem', required: true },
+    name: { type: String, required: true },       // snapshot at order time
+    price: { type: Number, required: true },       // snapshot at order time
+    quantity: { type: Number, required: true, min: 1 },
+    notes: { type: String, trim: true },           // e.g. "no onions"
+    kotPrinted: { type: Boolean, default: false }, // has this item been sent to kitchen?
+  },
+  { _id: true }
+);
+
+const statusHistorySchema = new mongoose.Schema(
+  {
+    status: { type: String, required: true },
+    changedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    at: { type: Date, default: Date.now },
+    note: { type: String },
+  },
+  { _id: false }
+);
+
+// ─── Main schema ──────────────────────────────────────────────────────────────
 
 const orderSchema = new mongoose.Schema(
   {
+    // Auto-incrementing human-readable order number (e.g. ORD-0042)
+    orderNumber: { type: String, unique: true },
+
     table: { type: mongoose.Schema.Types.ObjectId, ref: 'Table', required: true },
     waiter: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    items: [orderItemSchema],
+
+    items: { type: [orderItemSchema], validate: { validator: (v) => v.length > 0, message: 'Order must have at least one item' } },
+
     status: {
       type: String,
-      enum: ['pending', 'confirmed', 'preparing', 'ready', 'served', 'cancelled'],
+      enum: ['pending', 'confirmed', 'preparing', 'ready', 'served', 'paid', 'cancelled'],
       default: 'pending',
+      index: true,
     },
+
+    // KOT (Kitchen Order Ticket)
+    kotNumber: { type: String },          // e.g. KOT-0042
+    kotPrintedAt: { type: Date },
+
+    // Financials
+    subtotal: { type: Number, required: true },
+    taxRate: { type: Number, default: 0.1 },       // 10% default — configurable per order
+    taxAmount: { type: Number, default: 0 },
+    discountType: { type: String, enum: ['flat', 'percent', 'none'], default: 'none' },
+    discountValue: { type: Number, default: 0 },   // flat $ or percent %
+    discountAmount: { type: Number, default: 0 },  // computed
     totalAmount: { type: Number, required: true },
-    paymentStatus: { type: String, enum: ['unpaid', 'paid'], default: 'unpaid' },
-    notes: { type: String },
+
+    // Payment
+    paymentStatus: { type: String, enum: ['unpaid', 'paid', 'refunded'], default: 'unpaid' },
+    paymentMethod: { type: String, enum: ['cash', 'card', 'upi', 'wallet', 'complimentary'] },
+    paidAt: { type: Date },
+    billGeneratedAt: { type: Date },
+
+    // Inventory
+    inventoryDeducted: { type: Boolean, default: false },
+
+    // Audit trail
+    statusHistory: [statusHistorySchema],
+
+    notes: { type: String, trim: true },
   },
   { timestamps: true }
 );
+
+// ─── Pre-save: generate orderNumber ──────────────────────────────────────────
+
+orderSchema.pre('save', async function (next) {
+  if (this.isNew && !this.orderNumber) {
+    const count = await mongoose.model('Order').countDocuments();
+    this.orderNumber = `ORD-${String(count + 1).padStart(4, '0')}`;
+  }
+  next();
+});
+
+// ─── Indexes ──────────────────────────────────────────────────────────────────
+
+orderSchema.index({ table: 1, status: 1 });
+orderSchema.index({ createdAt: -1 });
 
 export default mongoose.model('Order', orderSchema);

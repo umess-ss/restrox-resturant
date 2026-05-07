@@ -2,9 +2,10 @@ import { NavLink } from 'react-router-dom';
 
 const links = [
   { to: '/', label: 'Dashboard', icon: '🏠' },
-  { to: '/menu', label: 'Menu', icon: '🍽️' },
+  { to: '/pos', label: 'POS', icon: '🧾' },
   { to: '/orders', label: 'Orders', icon: '📋' },
   { to: '/tables', label: 'Tables', icon: '🪑' },
+  { to: '/menu', label: 'Menu', icon: '🍽️' },
   { to: '/inventory', label: 'Inventory', icon: '📦' },
   { to: '/staff', label: 'Staff', icon: '👥' },
 ];
