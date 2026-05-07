@@ -13,6 +13,13 @@ import { useInventoryEvents } from '../socket/SocketContext.jsx';
 const UNITS = ['kg', 'g', 'l', 'ml', 'pcs', 'dozen', 'box'];
 const WASTAGE_REASONS = ['expired', 'spoiled', 'damaged', 'spillage', 'other'];
 
+const formatStock = (quantity, unit) => {
+  const value = Number(quantity) || 0;
+  if (unit === 'pcs') return `${Math.round(value)} ${unit}`;
+  if (['kg', 'l'].includes(unit)) return `${Number(value.toFixed(2)).toLocaleString()} ${unit}`;
+  return `${Number(value.toFixed(3)).toLocaleString()} ${unit}`;
+};
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StockBadge({ quantity, threshold }) {
@@ -60,7 +67,7 @@ function QuickActionModal({ ingredient, action, onClose, onDone }) {
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <form onSubmit={submit} className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm space-y-4">
         <h3 className="font-semibold text-gray-800">{titles[action]} — {ingredient.name}</h3>
-        <p className="text-sm text-gray-500">Current stock: <strong>{ingredient.quantity} {ingredient.unit}</strong></p>
+        <p className="text-sm text-gray-500">Current stock: <strong>{formatStock(ingredient.quantity, ingredient.unit)}</strong></p>
 
         <input
           type="number" step="0.001" min="0.001" required
@@ -106,7 +113,7 @@ export default function InventoryPage() {
   const [search, setSearch] = useState('');
   const [filterLow, setFilterLow] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const [items, sum] = await Promise.all([fetchIngredients(), fetchStockSummary()]);
       setIngredients(items);
@@ -114,7 +121,7 @@ export default function InventoryPage() {
     } catch {
       toast.error('Failed to load inventory');
     }
-  };
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -188,8 +195,8 @@ export default function InventoryPage() {
             {displayed.map((item) => (
               <tr key={item._id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 font-medium text-gray-800">{item.name}</td>
-                <td className="px-4 py-3 text-gray-700">{item.quantity} {item.unit}</td>
-                <td className="px-4 py-3 text-gray-500">{item.threshold} {item.unit}</td>
+                <td className="px-4 py-3 text-gray-700">{formatStock(item.quantity, item.unit)}</td>
+                <td className="px-4 py-3 text-gray-500">{formatStock(item.threshold, item.unit)}</td>
                 <td className="px-4 py-3 text-gray-500">${item.costPerUnit}</td>
                 <td className="px-4 py-3 text-gray-500">{item.supplier?.name}</td>
                 <td className="px-4 py-3">

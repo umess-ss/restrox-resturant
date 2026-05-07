@@ -7,6 +7,11 @@ import logger from '../../config/logger.js';
 import { getIO } from '../../socket/io.js';
 import { emitLowStockAlert, emitStockUpdate } from '../../socket/index.js';
 
+export const normalizeQuantity = (value, decimals = 3) => {
+  const factor = 10 ** decimals;
+  return Math.round((Number(value) + Number.EPSILON) * factor) / factor;
+};
+
 /**
  * Core stock mutation helper.
  * Atomically updates ingredient.quantity and writes a ledger entry.
@@ -39,14 +44,15 @@ export const applyStockDelta = async ({
     const ingredient = await Ingredient.findById(ingredientId).session(s);
     if (!ingredient) throw new Error(`Ingredient ${ingredientId} not found`);
 
-    const newQty = ingredient.quantity + delta;
+    const normalizedDelta = normalizeQuantity(delta);
+    const quantityBefore = normalizeQuantity(ingredient.quantity);
+    const newQty = normalizeQuantity(quantityBefore + normalizedDelta);
     if (newQty < 0) {
       throw new Error(
-        `Insufficient stock for "${ingredient.name}": have ${ingredient.quantity} ${ingredient.unit}, need ${Math.abs(delta)}`
+        `Insufficient stock for "${ingredient.name}": have ${quantityBefore} ${ingredient.unit}, need ${Math.abs(normalizedDelta)}`
       );
     }
 
-    const quantityBefore = ingredient.quantity;
     ingredient.quantity = newQty;
     await ingredient.save({ session: s });
 
@@ -55,7 +61,7 @@ export const applyStockDelta = async ({
         {
           ingredient: ingredientId,
           type,
-          quantity: delta,
+          quantity: normalizedDelta,
           quantityBefore,
           quantityAfter: newQty,
           costPerUnit: ingredient.costPerUnit,
@@ -89,7 +95,7 @@ export const applyStockDelta = async ({
 
 /**
  * Deducts ingredients for every item in an order based on its recipe.
- * Called when an order status transitions to 'served'.
+ * Called when an order status transitions to 'paid'.
  * Runs all deductions in a single transaction.
  *
  * @param {object[]} orderItems  - [{ menuItem, quantity }]
@@ -112,7 +118,7 @@ export const deductRecipeIngredients = async (orderItems, performedBy, orderId) 
       }
 
       for (const { ingredient, quantity: qtyPerServing } of recipe.ingredients) {
-        const delta = -(qtyPerServing * servings);
+        const delta = -normalizeQuantity(qtyPerServing * servings);
         await applyStockDelta({
           ingredientId: ingredient._id,
           delta,
@@ -154,7 +160,7 @@ export const recordWastage = async ({ ingredientId, quantity, reason, notes, rep
   try {
     const { ingredient, transaction } = await applyStockDelta({
       ingredientId,
-      delta: -quantity,
+      delta: -normalizeQuantity(quantity),
       type: 'wastage',
       performedBy: reportedBy,
       notes,
@@ -165,7 +171,7 @@ export const recordWastage = async ({ ingredientId, quantity, reason, notes, rep
       [
         {
           ingredient: ingredientId,
-          quantity,
+          quantity: normalizeQuantity(quantity),
           reason,
           notes,
           reportedBy,

@@ -1,6 +1,6 @@
 import Ingredient from './ingredient.model.js';
 import StockTransaction from './stockTransaction.model.js';
-import { applyStockDelta, getLowStockIngredients } from './inventory.service.js';
+import { applyStockDelta, getLowStockIngredients, normalizeQuantity } from './inventory.service.js';
 
 // ─── Ingredients CRUD ─────────────────────────────────────────────────────────
 
@@ -24,7 +24,11 @@ export const getIngredient = async (req, res) => {
 };
 
 export const createIngredient = async (req, res) => {
-  const ingredient = await Ingredient.create(req.body);
+  const ingredient = await Ingredient.create({
+    ...req.body,
+    quantity: normalizeQuantity(req.body.quantity ?? 0),
+    threshold: normalizeQuantity(req.body.threshold ?? 0),
+  });
   res.status(201).json(ingredient);
 };
 
@@ -61,7 +65,7 @@ export const stockIn = async (req, res) => {
   const { quantity, notes } = req.body;
   const { ingredient, transaction } = await applyStockDelta({
     ingredientId: req.params.id,
-    delta: +quantity,
+    delta: normalizeQuantity(quantity),
     type: 'stock_in',
     performedBy: req.user._id,
     reference: { kind: 'Manual' },
@@ -74,7 +78,7 @@ export const stockOut = async (req, res) => {
   const { quantity, notes } = req.body;
   const { ingredient, transaction } = await applyStockDelta({
     ingredientId: req.params.id,
-    delta: -quantity,
+    delta: -normalizeQuantity(quantity),
     type: 'stock_out',
     performedBy: req.user._id,
     reference: { kind: 'Manual' },
@@ -88,7 +92,8 @@ export const adjustStock = async (req, res) => {
   const ingredient = await Ingredient.findById(req.params.id);
   if (!ingredient) return res.status(404).json({ message: 'Ingredient not found' });
 
-  const delta = newQuantity - ingredient.quantity;
+  const normalizedNewQuantity = normalizeQuantity(newQuantity);
+  const delta = normalizeQuantity(normalizedNewQuantity - ingredient.quantity);
   if (delta === 0) return res.json({ message: 'No change needed', ingredient });
 
   const result = await applyStockDelta({
@@ -97,7 +102,7 @@ export const adjustStock = async (req, res) => {
     type: 'adjustment',
     performedBy: req.user._id,
     reference: { kind: 'Manual' },
-    notes: notes || `Manual adjustment to ${newQuantity}`,
+    notes: notes || `Manual adjustment to ${normalizedNewQuantity}`,
   });
   res.json(result);
 };

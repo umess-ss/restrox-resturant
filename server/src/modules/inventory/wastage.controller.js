@@ -1,11 +1,11 @@
 import Wastage from './wastage.model.js';
-import { recordWastage } from './inventory.service.js';
+import { normalizeQuantity, recordWastage } from './inventory.service.js';
 
 export const reportWastage = async (req, res) => {
   const { ingredientId, quantity, reason, notes } = req.body;
   const result = await recordWastage({
     ingredientId,
-    quantity,
+    quantity: normalizeQuantity(quantity),
     reason,
     notes,
     reportedBy: req.user._id,
