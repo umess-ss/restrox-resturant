@@ -1,0 +1,41 @@
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import rateLimit from 'express-rate-limit';
+
+import authRoutes from './modules/auth/auth.routes.js';
+import menuRoutes from './modules/menu/menu.routes.js';
+import orderRoutes from './modules/orders/order.routes.js';
+import tableRoutes from './modules/tables/table.routes.js';
+import staffRoutes from './modules/staff/staff.routes.js';
+import { errorHandler, notFound } from './middlewares/error.middleware.js';
+
+const app = express();
+
+// Security & parsing
+app.use(helmet());
+app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(morgan('dev'));
+
+// Rate limiting
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
+app.use('/api', limiter);
+
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/menu', menuRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/tables', tableRoutes);
+app.use('/api/staff', staffRoutes);
+
+// Health check
+app.get('/health', (_, res) => res.json({ status: 'ok' }));
+
+// Error handling
+app.use(notFound);
+app.use(errorHandler);
+
+export default app;
