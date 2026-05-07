@@ -7,12 +7,13 @@ import {
   printKOT,
   fetchBill,
   markBillPresented,
-  checkoutOrder,
   cancelOrder,
 } from '../api/orders.api.js';
+import { initiatePayment, verifyPayment } from '../api/payments.api.js';
 import { useSocketContext, useOrderEvents } from '../socket/SocketContext.jsx';
 import { EVENTS } from '../socket/events.js';
 import useNotificationSound from '../hooks/useNotificationSound.js';
+import formatCurrency from '../utils/formatCurrency.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -31,7 +32,7 @@ const NEXT_STATUS = {
   preparing: 'ready',   ready: 'served',
 };
 
-const PAYMENT_METHODS = ['cash', 'card', 'upi', 'wallet', 'complimentary'];
+const PAYMENT_METHODS = ['cash', 'esewa', 'khalti', 'qr', 'card'];
 
 const BILL_STATUS_LABELS = {
   not_requested: 'Bill not requested',
@@ -62,6 +63,7 @@ function BillModal({ orderId, onClose, onPaid }) {
   const [discountType, setDiscountType] = useState('none');
   const [discountValue, setDiscountValue] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [transactionId, setTransactionId] = useState('');
   const [loading, setLoading] = useState(false);
 
   const loadBill = useCallback(async () => {
@@ -83,11 +85,13 @@ function BillModal({ orderId, onClose, onPaid }) {
   const handleCheckout = async () => {
     setLoading(true);
     try {
-      await checkoutOrder(orderId, {
-        paymentMethod,
-        discountType: discountType !== 'none' ? discountType : undefined,
-        discountValue: discountValue ? Number(discountValue) : 0,
+      const { payment } = await initiatePayment({
+        orderId,
+        method: paymentMethod,
+        transactionId: transactionId || undefined,
+        source: 'pos',
       });
+      await verifyPayment({ paymentId: payment._id, status: 'success', transactionId: transactionId || undefined });
       toast.success('Payment recorded');
       onPaid();
       onClose();
@@ -119,7 +123,7 @@ function BillModal({ orderId, onClose, onPaid }) {
               {bill.items.map((item, i) => (
                 <div key={i} className="flex justify-between text-sm text-gray-700">
                   <span>{item.name} × {item.quantity}</span>
-                  <span>${item.lineTotal.toFixed(2)}</span>
+                  <span>{formatCurrency(item.lineTotal)}</span>
                 </div>
               ))}
             </div>
@@ -133,13 +137,13 @@ function BillModal({ orderId, onClose, onPaid }) {
                   className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-orange-400"
                 >
                   <option value="none">No discount</option>
-                  <option value="flat">Flat ($)</option>
+                  <option value="flat">Flat (Rs)</option>
                   <option value="percent">Percent (%)</option>
                 </select>
                 {discountType !== 'none' && (
                   <input
                     type="number" min="0" step="0.01"
-                    placeholder={discountType === 'percent' ? '%' : '$'}
+                    placeholder={discountType === 'percent' ? '%' : 'Rs'}
                     value={discountValue} onChange={(e) => setDiscountValue(e.target.value)}
                     className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-orange-400"
                   />
@@ -151,20 +155,20 @@ function BillModal({ orderId, onClose, onPaid }) {
             {/* Totals */}
             <div className="border-t border-gray-100 pt-3 space-y-1 text-sm">
               <div className="flex justify-between text-gray-600">
-                <span>Subtotal</span><span>${bill.subtotal.toFixed(2)}</span>
+                <span>Subtotal</span><span>{formatCurrency(bill.subtotal)}</span>
               </div>
               {bill.discountAmount > 0 && (
                 <div className="flex justify-between text-green-600">
-                  <span>Discount ({bill.discountType === 'percent' ? `${bill.discountValue}%` : `$${bill.discountValue}`})</span>
-                  <span>−${bill.discountAmount.toFixed(2)}</span>
+                  <span>Discount ({bill.discountType === 'percent' ? `${bill.discountValue}%` : formatCurrency(bill.discountValue)})</span>
+                  <span>−{formatCurrency(bill.discountAmount)}</span>
                 </div>
               )}
               <div className="flex justify-between text-gray-600">
                 <span>Tax ({(bill.taxRate * 100).toFixed(0)}%)</span>
-                <span>${bill.taxAmount.toFixed(2)}</span>
+                <span>{formatCurrency(bill.taxAmount)}</span>
               </div>
               <div className="flex justify-between font-bold text-gray-900 text-base pt-1 border-t border-gray-200">
-                <span>Total</span><span>${bill.totalAmount.toFixed(2)}</span>
+                <span>Total</span><span>{formatCurrency(bill.totalAmount)}</span>
               </div>
             </div>
 
@@ -182,10 +186,22 @@ function BillModal({ orderId, onClose, onPaid }) {
               </div>
             </div>
 
+            {['esewa', 'khalti', 'qr', 'card'].includes(paymentMethod) && (
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">TRANSACTION ID</label>
+                <input
+                  value={transactionId}
+                  onChange={(e) => setTransactionId(e.target.value)}
+                  placeholder="Manual payment reference"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                />
+              </div>
+            )}
+
             <button
               onClick={handleCheckout} disabled={loading}
               className="w-full bg-green-500 text-white rounded-xl py-3 font-semibold hover:bg-green-600 disabled:opacity-50 transition-colors"
-            >{loading ? 'Processing...' : `Collect $${bill.totalAmount.toFixed(2)}`}</button>
+            >{loading ? 'Processing...' : `Collect ${formatCurrency(bill.totalAmount)}`}</button>
           </div>
         )}
       </div>
@@ -258,7 +274,7 @@ function OrderRow({ order, onAdvance, onBill, onCancel, onKOT, onBillPresented, 
             )}
           </div>
           <p className="text-sm text-gray-500 mt-0.5">
-            Table {order.table?.number} · {order.items?.length} item(s) · ${order.totalAmount?.toFixed(2)}
+            Table {order.table?.number} · {order.items?.length} item(s) · {formatCurrency(order.totalAmount)}
           </p>
           <p className="text-xs text-gray-400">{order.waiter?.name} · {new Date(order.createdAt).toLocaleTimeString()}</p>
           <CustomerInfo order={order} />

@@ -15,6 +15,8 @@ import { getIO } from '../../socket/io.js';
 import { emitCustomerOrderEvent, emitTableEvent } from '../../socket/index.js';
 import { EVENTS, ROOMS } from '../../socket/events.js';
 import logger from '../../config/logger.js';
+import formatCurrency from '../../utils/formatCurrency.js';
+import { getLatestSuccessfulPayment } from '../payments/payment.service.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -28,7 +30,7 @@ const assertObjectId = (value, label) => {
   }
 };
 
-const publicBillPayload = (order) => ({
+const publicBillPayload = (order, payment) => ({
   orderNumber: order.orderNumber,
   tableNumber: order.table?.number,
   customerName: order.customerName,
@@ -47,6 +49,8 @@ const publicBillPayload = (order) => ({
   orderStatus: order.status,
   paymentStatus: order.paymentStatus,
   billStatus: order.billStatus,
+  paymentMethod: payment?.method || order.paymentMethod,
+  transactionId: payment?.transactionId || order.transactionId,
 });
 
 const emitBillEvent = (io, order, event, payload) => {
@@ -375,12 +379,13 @@ export const getPublicBill = async (orderId) => {
   assertObjectId(orderId, 'orderId');
 
   const order = await Order.findById(orderId)
-    .select('orderNumber table customerName customerPhone items subtotal taxAmount discountAmount totalAmount status paymentStatus billStatus')
+    .select('orderNumber table customerName customerPhone items subtotal taxAmount discountAmount totalAmount status paymentStatus billStatus paymentMethod transactionId')
     .populate('table', 'number')
     .lean();
 
   if (!order) throw Object.assign(new Error('Order not found'), { status: 404 });
-  return publicBillPayload(order);
+  const payment = await getLatestSuccessfulPayment(order._id);
+  return publicBillPayload(order, payment);
 };
 
 export const requestBillForOrder = async (orderId) => {
@@ -425,13 +430,15 @@ export const getReceiptPdf = async (orderId) => {
     `Table: ${bill.tableNumber || '-'}`,
     bill.customerName ? `Customer: ${bill.customerName}` : null,
     '',
-    ...bill.items.map((i) => `${i.name} x${i.quantity}  $${i.lineTotal.toFixed(2)}`),
+    ...bill.items.map((i) => `${i.name} x${i.quantity}  ${formatCurrency(i.lineTotal)}`),
     '',
-    `Subtotal: $${bill.subtotal.toFixed(2)}`,
-    `Discount: $${bill.discount.toFixed(2)}`,
-    `Tax: $${bill.tax.toFixed(2)}`,
-    `Service charge: $${bill.serviceCharge.toFixed(2)}`,
-    `Total: $${bill.totalAmount.toFixed(2)}`,
+    `Subtotal: ${formatCurrency(bill.subtotal)}`,
+    `Discount: ${formatCurrency(bill.discount)}`,
+    `Tax: ${formatCurrency(bill.tax)}`,
+    `Service charge: ${formatCurrency(bill.serviceCharge)}`,
+    `Total: ${formatCurrency(bill.totalAmount)}`,
+    bill.paymentMethod ? `Payment method: ${bill.paymentMethod}` : null,
+    bill.transactionId ? `Transaction ID: ${bill.transactionId}` : null,
     'Payment completed',
   ].filter((line) => line !== null);
 

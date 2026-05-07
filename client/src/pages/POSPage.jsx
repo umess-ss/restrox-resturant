@@ -5,6 +5,7 @@ import { fetchMenuItems } from '../api/menu.api.js';
 import { createOrder, addItemsToOrder, printKOT } from '../api/orders.api.js';
 import { useSocketContext, useOrderEvents, useTableEvents } from '../socket/SocketContext.jsx';
 import { EVENTS } from '../socket/events.js';
+import formatCurrency from '../utils/formatCurrency.js';
 
 const CATEGORY_ICONS = {
   appetizer: '🥗', main: '🍽️', dessert: '🍰', beverage: '🥤', special: '⭐',
@@ -31,7 +32,7 @@ function Cart({ cart, onQtyChange, onRemove, onSubmit, onKOT, activeOrder, loadi
           <div key={item._id} className="flex items-center gap-2">
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-800 truncate">{item.name}</p>
-              <p className="text-xs text-gray-500">${item.price.toFixed(2)} each</p>
+              <p className="text-xs text-gray-500">{formatCurrency(item.price)} each</p>
             </div>
             <div className="flex items-center gap-1">
               <button
@@ -45,7 +46,7 @@ function Cart({ cart, onQtyChange, onRemove, onSubmit, onKOT, activeOrder, loadi
               >+</button>
             </div>
             <span className="text-sm font-semibold text-gray-700 w-14 text-right">
-              ${(item.price * item.qty).toFixed(2)}
+              {formatCurrency(item.price * item.qty)}
             </span>
             <button onClick={() => onRemove(item._id)} className="text-red-400 hover:text-red-600 text-lg leading-none">×</button>
           </div>
@@ -55,7 +56,7 @@ function Cart({ cart, onQtyChange, onRemove, onSubmit, onKOT, activeOrder, loadi
       <div className="p-4 border-t border-gray-100 space-y-3">
         <div className="flex justify-between text-sm font-semibold text-gray-800">
           <span>Subtotal</span>
-          <span>${subtotal.toFixed(2)}</span>
+          <span>{formatCurrency(subtotal)}</span>
         </div>
         <div className="flex gap-2">
           {activeOrder && (
@@ -269,7 +270,7 @@ export default function POSPage() {
               >
                 <p className="text-xs text-gray-400 capitalize mb-1">{CATEGORY_ICONS[item.category]} {item.category}</p>
                 <p className="font-medium text-gray-800 text-sm leading-tight">{item.name}</p>
-                <p className="text-orange-500 font-bold mt-1">${item.price.toFixed(2)}</p>
+                <p className="text-orange-500 font-bold mt-1">{formatCurrency(item.price)}</p>
                 {cart.find((c) => c._id === item._id) && (
                   <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full mt-1 inline-block">
                     ×{cart.find((c) => c._id === item._id).qty}

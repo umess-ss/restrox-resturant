@@ -7,7 +7,9 @@ import {
   publicReceiptPdfUrl,
   callPublicWaiter,
 } from '../../api/public.api.js';
+import { initiatePublicPayment, verifyPublicPayment } from '../../api/payments.api.js';
 import usePublicOrderSocket from '../../hooks/usePublicOrderSocket.js';
+import formatCurrency from '../../utils/formatCurrency.js';
 
 // ─── Status timeline config ───────────────────────────────────────────────────
 
@@ -31,8 +33,6 @@ const STATUS_MESSAGES = {
   paid:      'Thank you for dining with us! See you again.',
   cancelled: 'Your order was cancelled. Please speak to a staff member.',
 };
-
-const fmt = (n) => Number(n).toFixed(2);
 
 // ─── Item status badge ────────────────────────────────────────────────────────
 
@@ -147,19 +147,25 @@ function BillPreview({ bill, onClose }) {
           {bill.items.map((item, i) => (
             <div key={i} className="flex justify-between gap-3 text-sm">
               <span className="text-gray-700">{item.name} ×{item.quantity}</span>
-              <span className="font-medium text-gray-800">${fmt(item.lineTotal)}</span>
+              <span className="font-medium text-gray-800">{formatCurrency(item.lineTotal)}</span>
             </div>
           ))}
         </div>
 
         <div className="border-t border-gray-100 pt-3 space-y-1 text-sm">
-          <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>${fmt(bill.subtotal)}</span></div>
-          <div className="flex justify-between text-gray-600"><span>Discount</span><span>${fmt(bill.discount)}</span></div>
-          <div className="flex justify-between text-gray-600"><span>Tax</span><span>${fmt(bill.tax)}</span></div>
-          <div className="flex justify-between text-gray-600"><span>Service charge</span><span>${fmt(bill.serviceCharge)}</span></div>
+          <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{formatCurrency(bill.subtotal)}</span></div>
+          <div className="flex justify-between text-gray-600"><span>Discount</span><span>{formatCurrency(bill.discount)}</span></div>
+          <div className="flex justify-between text-gray-600"><span>Tax</span><span>{formatCurrency(bill.tax)}</span></div>
+          <div className="flex justify-between text-gray-600"><span>Service charge</span><span>{formatCurrency(bill.serviceCharge)}</span></div>
           <div className="flex justify-between font-bold text-gray-900 pt-2 border-t border-gray-100">
-            <span>Total</span><span>${fmt(bill.totalAmount)}</span>
+            <span>Total</span><span>{formatCurrency(bill.totalAmount)}</span>
           </div>
+          {bill.paymentMethod && (
+            <div className="flex justify-between text-gray-600 capitalize"><span>Payment</span><span>{bill.paymentMethod}</span></div>
+          )}
+          {bill.transactionId && (
+            <div className="flex justify-between text-gray-600"><span>Transaction ID</span><span>{bill.transactionId}</span></div>
+          )}
         </div>
       </div>
     </div>
@@ -176,6 +182,8 @@ export default function CustomerOrderStatusPage() {
   const [waiterCooldown, setWaiterCooldown] = useState(0); // seconds remaining
   const [bill, setBill] = useState(null);
   const [billLoading, setBillLoading] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState('');
+  const [cashMessage, setCashMessage] = useState(false);
   const cooldownRef = useRef(null);
 
   // ─── Fetch order status ──────────────────────────────────────────────────
@@ -245,6 +253,28 @@ export default function CustomerOrderStatusPage() {
       fetchStatus();
     } catch {
       alert('Could not request bill. Please call the waiter.');
+    }
+  };
+
+  const handleMockPayment = async (method) => {
+    setPaymentLoading(method);
+    try {
+      const { payment } = await initiatePublicPayment({
+        orderId,
+        method,
+        source: 'customer_qr',
+      });
+      await verifyPublicPayment({
+        paymentId: payment._id,
+        status: 'success',
+        transactionId: `${method.toUpperCase()}-MOCK-${Date.now()}`,
+      });
+      await fetchStatus();
+      setBill(await fetchPublicBill(orderId));
+    } catch (err) {
+      alert(err.response?.data?.message || 'Mock payment failed. Please speak to staff.');
+    } finally {
+      setPaymentLoading('');
     }
   };
 
@@ -358,7 +388,7 @@ export default function CustomerOrderStatusPage() {
           {order.totalAmount != null && (
             <div className="border-t border-gray-100 mt-3 pt-3 flex justify-between text-sm font-semibold text-gray-800">
               <span>Total</span>
-              <span>${fmt(order.totalAmount)}</span>
+              <span>{formatCurrency(order.totalAmount)}</span>
             </div>
           )}
         </div>
@@ -384,6 +414,38 @@ export default function CustomerOrderStatusPage() {
             >
               Download Receipt PDF
             </a>
+          </div>
+        )}
+
+        {order.paymentStatus !== 'paid' && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Payment Options</h2>
+              <p className="text-xs text-gray-400 mt-1">eSewa/Khalti are sandbox mock payments for development.</p>
+            </div>
+            <button
+              onClick={() => setCashMessage(true)}
+              className="w-full rounded-xl py-3 font-semibold bg-gray-100 text-gray-700"
+            >
+              Cash
+            </button>
+            {cashMessage && (
+              <p className="text-sm text-gray-600 bg-gray-50 border border-gray-100 rounded-xl p-3">
+                Please pay at counter or to waiter.
+              </p>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              {['esewa', 'khalti'].map((method) => (
+                <button
+                  key={method}
+                  onClick={() => handleMockPayment(method)}
+                  disabled={!!paymentLoading}
+                  className="rounded-xl py-3 font-semibold bg-green-500 text-white disabled:opacity-50 capitalize"
+                >
+                  {paymentLoading === method ? 'Processing...' : `Pay with ${method}`}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

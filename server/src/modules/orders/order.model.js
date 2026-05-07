@@ -71,7 +71,8 @@ const orderSchema = new mongoose.Schema(
       default: 'not_requested',
       index: true,
     },
-    paymentMethod: { type: String, enum: ['cash', 'card', 'upi', 'wallet', 'complimentary'] },
+    paymentMethod: { type: String, enum: ['cash', 'esewa', 'khalti', 'qr', 'card', 'upi', 'wallet', 'complimentary'] },
+    transactionId: { type: String, trim: true },
     paidAt: { type: Date },
     billGeneratedAt: { type: Date },
 

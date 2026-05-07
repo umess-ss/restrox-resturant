@@ -10,6 +10,7 @@ import {
   fetchAllMargins,
 } from '../api/menu.api.js';
 import { fetchIngredients } from '../api/inventory.api.js';
+import formatCurrency from '../utils/formatCurrency.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -119,7 +120,7 @@ function RecipeEditor({ item, ingredients, onClose, onSaved }) {
         <div className="p-6 border-b border-gray-100 flex justify-between items-center">
           <div>
             <h3 className="font-semibold text-gray-800 text-lg">Recipe — {item.name}</h3>
-            <p className="text-sm text-gray-500">Selling price: <strong>${item.price}</strong></p>
+            <p className="text-sm text-gray-500">Selling price: <strong>{formatCurrency(item.price)}</strong></p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
         </div>
@@ -177,25 +178,25 @@ function RecipeEditor({ item, ingredients, onClose, onSaved }) {
               {margin.breakdown.map((b, i) => (
                 <div key={i} className="flex justify-between text-gray-600">
                   <span>{b.ingredient} × {b.quantity} {b.unit}</span>
-                  <span>${b.lineCost.toFixed(4)}</span>
+                  <span>{formatCurrency(b.lineCost)}</span>
                 </div>
               ))}
               <div className="border-t border-gray-200 pt-2 mt-2 space-y-1">
                 <div className="flex justify-between text-gray-600">
-                  <span>Ingredient cost</span><span>${margin.ingredientCost.toFixed(4)}</span>
+                  <span>Ingredient cost</span><span>{formatCurrency(margin.ingredientCost)}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
-                  <span>Overhead</span><span>${margin.overheadCost.toFixed(4)}</span>
+                  <span>Overhead</span><span>{formatCurrency(margin.overheadCost)}</span>
                 </div>
                 <div className="flex justify-between font-semibold text-gray-800">
-                  <span>Total cost</span><span>${margin.totalCost.toFixed(4)}</span>
+                  <span>Total cost</span><span>{formatCurrency(margin.totalCost)}</span>
                 </div>
                 <div className="flex justify-between font-semibold text-gray-800">
-                  <span>Selling price</span><span>${margin.sellingPrice.toFixed(2)}</span>
+                  <span>Selling price</span><span>{formatCurrency(margin.sellingPrice)}</span>
                 </div>
                 <div className={`flex justify-between font-bold text-base ${margin.marginPct >= 50 ? 'text-green-600' : margin.marginPct >= 30 ? 'text-yellow-600' : 'text-red-600'}`}>
                   <span>Gross margin</span>
-                  <span>{margin.marginPct.toFixed(1)}% (${margin.grossProfit.toFixed(2)})</span>
+                  <span>{margin.marginPct.toFixed(1)}% ({formatCurrency(margin.grossProfit)})</span>
                 </div>
               </div>
             </div>
@@ -288,8 +289,8 @@ function ItemFormModal({ item, onClose, onSaved }) {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          {field('Price ($) *', 'price', 'number', { min: 0, step: '0.01', required: true })}
-          {field('Overhead Cost ($)', 'overheadCost', 'number', { min: 0, step: '0.01' })}
+          {field('Price (Rs) *', 'price', 'number', { min: 0, step: '0.01', required: true })}
+          {field('Overhead Cost (Rs)', 'overheadCost', 'number', { min: 0, step: '0.01' })}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -384,12 +385,12 @@ function MarginsPanel({ onClose }) {
                         {r.menuItem.category}
                       </span>
                     </td>
-                    <td className="py-2 text-right text-gray-700">${r.sellingPrice?.toFixed(2)}</td>
+                    <td className="py-2 text-right text-gray-700">{formatCurrency(r.sellingPrice)}</td>
                     <td className="py-2 text-right text-gray-500">
-                      {r.totalCost !== null ? `$${r.totalCost.toFixed(2)}` : '—'}
+                      {r.totalCost !== null ? formatCurrency(r.totalCost) : '—'}
                     </td>
                     <td className="py-2 text-right text-gray-700">
-                      {r.grossProfit !== null ? `$${r.grossProfit.toFixed(2)}` : '—'}
+                      {r.grossProfit !== null ? formatCurrency(r.grossProfit) : '—'}
                     </td>
                     <td className="py-2 text-right">
                       <MarginBadge pct={r.marginPct} />
@@ -509,7 +510,7 @@ export default function MenuPage() {
 
             {/* Price + margin row */}
             <div className="flex items-center justify-between">
-              <span className="text-orange-500 font-bold text-lg">${Number(item.price).toFixed(2)}</span>
+              <span className="text-orange-500 font-bold text-lg">{formatCurrency(item.price)}</span>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-400">⏱ {item.preparationTime}m</span>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${item.isAvailable ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>

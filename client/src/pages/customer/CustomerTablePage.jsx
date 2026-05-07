@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchPublicTable, fetchPublicMenu, placePublicOrder } from '../../api/public.api.js';
+import formatCurrency from '../../utils/formatCurrency.js';
 
 // ─── Category icons ───────────────────────────────────────────────────────────
 
@@ -9,8 +10,6 @@ const CAT_ICONS = {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const fmt = (n) => Number(n).toFixed(2);
 
 const itemImageUrl = (item) => item?.imageUrl || item?.image || '';
 
@@ -87,7 +86,7 @@ function CartDrawer({ cart, onQty, onNotes, onClose, onSubmit, submitting, table
             <div key={item._id} className="flex items-start gap-3">
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-gray-800 text-sm">{item.name}</p>
-                <p className="text-orange-500 text-sm font-semibold">${fmt(item.price)}</p>
+                <p className="text-orange-500 text-sm font-semibold">{formatCurrency(item.price)}</p>
                 {item.notes && (
                   <p className="text-xs text-gray-400 italic mt-0.5">"{item.notes}"</p>
                 )}
@@ -110,7 +109,7 @@ function CartDrawer({ cart, onQty, onNotes, onClose, onSubmit, submitting, table
                 >+</button>
               </div>
               <span className="text-sm font-semibold text-gray-700 w-14 text-right shrink-0">
-                ${fmt(item.price * item.qty)}
+                {formatCurrency(item.price * item.qty)}
               </span>
             </div>
           ))}
@@ -140,14 +139,14 @@ function CartDrawer({ cart, onQty, onNotes, onClose, onSubmit, submitting, table
         <div className="px-5 pb-6 pt-3 border-t border-gray-100 space-y-3">
           <div className="flex justify-between text-sm font-semibold text-gray-800">
             <span>Subtotal (excl. tax)</span>
-            <span>${fmt(subtotal)}</span>
+            <span>{formatCurrency(subtotal)}</span>
           </div>
           <button
             onClick={() => onSubmit({ customerName, customerPhone, customerNote })}
             disabled={submitting || cart.length === 0}
             className="w-full bg-orange-500 text-white rounded-2xl py-3.5 font-bold text-base hover:bg-orange-600 disabled:opacity-50 transition-colors"
           >
-            {submitting ? 'Placing order…' : `Place Order · $${fmt(subtotal)}`}
+            {submitting ? 'Placing order…' : `Place Order · ${formatCurrency(subtotal)}`}
           </button>
         </div>
       </div>
@@ -355,7 +354,7 @@ export default function CustomerTablePage() {
                     <span className="text-xs text-gray-400">⏱ {item.preparationTime}m</span>
                   )}
                 </div>
-                <p className="text-orange-500 font-bold mt-1">${fmt(item.price)}</p>
+                <p className="text-orange-500 font-bold mt-1">{formatCurrency(item.price)}</p>
               </div>
 
               {/* Add / qty control */}
@@ -391,7 +390,7 @@ export default function CustomerTablePage() {
           >
             <span className="bg-white/20 rounded-xl px-2 py-0.5 text-sm font-bold">{cartCount}</span>
             <span>View Order</span>
-            <span>${fmt(cart.reduce((s, i) => s + i.price * i.qty, 0))}</span>
+            <span>{formatCurrency(cart.reduce((s, i) => s + i.price * i.qty, 0))}</span>
           </button>
         </div>
       )}

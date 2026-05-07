@@ -343,6 +343,8 @@ export const generateBill = async (orderId, { discountType, discountValue } = {}
     taxAmount: order.taxAmount,
     totalAmount: order.totalAmount,
     paymentStatus: order.paymentStatus,
+    paymentMethod: order.paymentMethod,
+    transactionId: order.transactionId,
     billGeneratedAt: order.billGeneratedAt,
     createdAt: order.createdAt,
   };
@@ -353,7 +355,7 @@ export const generateBill = async (orderId, { discountType, discountValue } = {}
 /**
  * Marks order as paid, records payment method, frees the table.
  */
-export const checkout = async (orderId, { paymentMethod, discountType, discountValue }, userId) => {
+export const checkout = async (orderId, { paymentMethod, discountType, discountValue, transactionId }, userId) => {
   const order = await Order.findById(orderId);
   if (!order) throw Object.assign(new Error('Order not found'), { status: 404 });
   if (order.paymentStatus === 'paid') throw Object.assign(new Error('Order already paid'), { status: 409 });
@@ -368,5 +370,6 @@ export const checkout = async (orderId, { paymentMethod, discountType, discountV
   }
 
   order.paymentMethod = paymentMethod;
+  if (transactionId) order.transactionId = transactionId;
   return transitionStatus(orderId, 'paid', userId, `Payment via ${paymentMethod}`);
 };

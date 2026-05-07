@@ -63,7 +63,7 @@ router.patch('/:id/bill-presented', can('orders:write'), markBillPresented);
 router.post(
   '/:id/checkout',
   can('orders:pay'),
-  [body('paymentMethod').isIn(['cash', 'card', 'upi', 'wallet', 'complimentary']).withMessage('Invalid payment method')],
+  [body('paymentMethod').isIn(['cash', 'esewa', 'khalti', 'qr', 'card', 'upi', 'wallet', 'complimentary']).withMessage('Invalid payment method')],
   validate,
   checkoutOrder
 );

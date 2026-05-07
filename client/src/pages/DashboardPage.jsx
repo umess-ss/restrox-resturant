@@ -14,6 +14,7 @@ import useAuthStore from '../store/authStore.js';
 import { useAnalyticsEvents, useSocketContext } from '../socket/SocketContext.jsx';
 import { EVENTS } from '../socket/events.js';
 import useNotificationSound from '../hooks/useNotificationSound.js';
+import formatCurrency from '../utils/formatCurrency.js';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 
@@ -52,11 +53,11 @@ function KPICards({ overview }) {
   if (!overview) return <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">{Array(5).fill(0).map((_, i) => <Skeleton key={i} h="h-24" />)}</div>;
 
   const cards = [
-    { label: "Today's Revenue", value: `$${fmt(overview.todayRevenue)}`, sub: `${overview.todayOrders} orders`, color: 'bg-orange-500' },
-    { label: 'Month Revenue', value: `$${fmt(overview.monthRevenue)}`, sub: `${overview.monthOrders} orders`, color: 'bg-purple-500' },
+    { label: "Today's Revenue", value: formatCurrency(overview.todayRevenue), sub: `${overview.todayOrders} orders`, color: 'bg-orange-500' },
+    { label: 'Month Revenue', value: formatCurrency(overview.monthRevenue), sub: `${overview.monthOrders} orders`, color: 'bg-purple-500' },
     { label: 'Active Orders', value: overview.activeOrders, sub: 'right now', color: 'bg-blue-500' },
-    { label: 'Inventory Value', value: `$${fmt(overview.inventoryValue)}`, sub: `${overview.lowStockCount} low stock`, color: overview.lowStockCount > 0 ? 'bg-red-500' : 'bg-green-500' },
-    { label: 'Payroll This Month', value: `$${fmt(overview.payrollCost)}`, sub: `${overview.staffCount} staff`, color: 'bg-teal-500' },
+    { label: 'Inventory Value', value: formatCurrency(overview.inventoryValue), sub: `${overview.lowStockCount} low stock`, color: overview.lowStockCount > 0 ? 'bg-red-500' : 'bg-green-500' },
+    { label: 'Payroll This Month', value: formatCurrency(overview.payrollCost), sub: `${overview.staffCount} staff`, color: 'bg-teal-500' },
   ];
 
   return (
@@ -97,8 +98,8 @@ function RevenueTrendChart() {
           <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
             <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(v) => v.slice(5)} />
-            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} width={55} />
-            <Tooltip formatter={(v) => [`$${fmt(v)}`, 'Revenue']} labelStyle={{ fontSize: 12 }} />
+            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `Rs ${v}`} width={55} />
+            <Tooltip formatter={(v) => [formatCurrency(v), 'Revenue']} labelStyle={{ fontSize: 12 }} />
             <Line type="monotone" dataKey="revenue" stroke="#f97316" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
           </LineChart>
         </ResponsiveContainer>
@@ -160,7 +161,7 @@ function CategoryPieChart({ data }) {
               <Cell key={entry.category} fill={CATEGORY_COLORS[entry.category] || COLORS[0]} />
             ))}
           </Pie>
-          <Tooltip formatter={(v) => [`$${fmt(v)}`, 'Revenue']} />
+          <Tooltip formatter={(v) => [formatCurrency(v), 'Revenue']} />
           <Legend formatter={(v) => <span className="text-xs capitalize">{v}</span>} />
         </PieChart>
       </ResponsiveContainer>
@@ -237,8 +238,8 @@ function ProfitChart() {
           <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
             <XAxis dataKey="category" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} width={55} />
-            <Tooltip formatter={(v) => `$${fmt(v)}`} />
+            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `Rs ${v}`} width={55} />
+            <Tooltip formatter={(v) => formatCurrency(v)} />
             <Legend />
             <Bar dataKey="revenue" fill="#f97316" name="Revenue" radius={[3, 3, 0, 0]} />
             <Bar dataKey="cost" fill="#ef4444" name="Ingredient Cost" radius={[3, 3, 0, 0]} />
@@ -342,7 +343,7 @@ function StaffPerformanceTable() {
                 <td className="py-2 text-right text-gray-700">{s.totalNetHours}h</td>
                 <td className="py-2 text-right text-orange-500">{s.totalOvertimeHours}h</td>
                 <td className="py-2 text-right font-semibold text-gray-800">
-                  {s.netPay !== null ? `$${fmt(s.netPay)}` : '—'}
+                  {s.netPay !== null ? formatCurrency(s.netPay) : '—'}
                 </td>
               </tr>
             ))}
@@ -350,7 +351,7 @@ function StaffPerformanceTable() {
           <tfoot className="border-t-2 border-gray-200">
             <tr>
               <td colSpan={7} className="py-2 text-sm font-semibold text-gray-700">Total Payroll</td>
-              <td className="py-2 text-right font-bold text-gray-900">${fmt(data.totalPayrollCost)}</td>
+              <td className="py-2 text-right font-bold text-gray-900">{formatCurrency(data.totalPayrollCost)}</td>
             </tr>
           </tfoot>
         </table>
