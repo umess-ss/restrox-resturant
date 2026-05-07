@@ -22,6 +22,10 @@ export const EVENTS = Object.freeze({
   CONNECTED:                'rms:connected',
   ERROR:                    'rms:error',
 
+  // ─── Customer QR ─────────────────────────────────────────────────────────
+  CUSTOMER_CALL_WAITER:     'customer:call_waiter',
+
+  // ─── Client → Server ─────────────────────────────────────────────────────
   CLIENT_JOIN_ORDER:        'client:join_order',
   CLIENT_LEAVE_ORDER:       'client:leave_order',
   CLIENT_JOIN_TABLE:        'client:join_table',

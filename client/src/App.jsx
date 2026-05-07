@@ -11,6 +11,8 @@ import InventoryPage from './pages/InventoryPage.jsx';
 import POSPage from './pages/POSPage.jsx';
 import KDSPage from './pages/KDSPage.jsx';
 import OnboardPage from './pages/OnboardPage.jsx';
+import CustomerTablePage from './pages/customer/CustomerTablePage.jsx';
+import CustomerOrderStatusPage from './pages/customer/CustomerOrderStatusPage.jsx';
 
 const PrivateRoute = ({ children }) => {
   const token = useAuthStore((s) => s.accessToken);
@@ -20,6 +22,17 @@ const PrivateRoute = ({ children }) => {
 export default function App() {
   return (
     <Routes>
+      {/* ─── Public customer QR routes — no auth, no layout ─── */}
+      <Route
+        path="/customer/:restaurantId/:branchId/table/:tableId"
+        element={<CustomerTablePage />}
+      />
+      <Route
+        path="/customer/order/:orderId/status"
+        element={<CustomerOrderStatusPage />}
+      />
+
+      {/* ─── Staff / admin routes ─── */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/onboard" element={<OnboardPage />} />
       <Route
