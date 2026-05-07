@@ -52,6 +52,12 @@ export default function LoginPage() {
         >
           {loading ? 'Signing in...' : 'Sign In'}
         </button>
+        <p className="text-center text-sm text-gray-500">
+          New restaurant?{' '}
+          <a href="/onboard" className="text-orange-500 hover:text-orange-600 font-medium">
+            Start free trial
+          </a>
+        </p>
       </form>
     </div>
   );

@@ -53,21 +53,21 @@ export const calcFinancials = (items, { taxRate = 0.1, discountType = 'none', di
  * Creates an order and marks the table as occupied.
  * Validates that the table is available and all menu items exist and are available.
  */
-export const createOrder = async ({ tableId, itemInputs, notes, taxRate, userId }) => {
+export const createOrder = async ({ tableId, itemInputs, notes, taxRate, userId, restaurantId, branchId }) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    // Validate table
-    const table = await Table.findById(tableId).session(session);
+    // Validate table — must belong to same restaurant+branch
+    const table = await Table.findOne({ _id: tableId, restaurant: restaurantId }).session(session);
     if (!table) throw Object.assign(new Error('Table not found'), { status: 404 });
     if (table.status === 'occupied') {
       throw Object.assign(new Error(`Table ${table.number} is already occupied`), { status: 409 });
     }
 
-    // Validate + snapshot menu items
+    // Validate + snapshot menu items — must belong to same restaurant
     const menuIds = itemInputs.map((i) => i.menuItem);
-    const menuItems = await MenuItem.find({ _id: { $in: menuIds }, isAvailable: true }).session(session);
+    const menuItems = await MenuItem.find({ _id: { $in: menuIds }, isAvailable: true, restaurant: restaurantId }).session(session);
     const menuMap = new Map(menuItems.map((m) => [m._id.toString(), m]));
 
     const items = itemInputs.map((input) => {
@@ -84,6 +84,8 @@ export const createOrder = async ({ tableId, itemInputs, notes, taxRate, userId 
 
     const [order] = await Order.create(
       [{
+        restaurant: restaurantId,
+        branch: branchId,
         table: tableId,
         waiter: userId,
         items,

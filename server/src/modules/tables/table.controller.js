@@ -3,7 +3,7 @@ import Order from '../orders/order.model.js';
 
 export const getTables = async (req, res) => {
   const { status, location } = req.query;
-  const filter = {};
+  const filter = { ...req.branchFilter };
   if (status) filter.status = status;
   if (location) filter.location = location;
 
@@ -14,13 +14,13 @@ export const getTables = async (req, res) => {
 };
 
 export const getTable = async (req, res) => {
-  const table = await Table.findById(req.params.id).populate('currentOrder');
+  const table = await Table.findOne({ _id: req.params.id, ...req.tenantFilter }).populate('currentOrder');
   if (!table) return res.status(404).json({ message: 'Table not found' });
   res.json(table);
 };
 
 export const createTable = async (req, res) => {
-  const table = await Table.create(req.body);
+  const table = await Table.create({ ...req.body, restaurant: req.restaurantId, branch: req.branchId });
   res.status(201).json(table);
 };
 

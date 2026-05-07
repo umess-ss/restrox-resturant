@@ -12,6 +12,7 @@ import tableRoutes from './modules/tables/table.routes.js';
 import staffRoutes from './modules/staff/staff.routes.js';
 import inventoryRoutes from './modules/inventory/inventory.routes.js';
 import analyticsRoutes from './modules/analytics/analytics.routes.js';
+import saasRoutes from './modules/saas/restaurant.routes.js';
 import { errorHandler, notFound } from './middlewares/error.middleware.js';
 
 const app = express();
@@ -48,6 +49,7 @@ app.use('/api/tables', tableRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/saas', saasRoutes);
 
 // Health check
 app.get('/health', (_, res) => res.json({ status: 'ok' }));

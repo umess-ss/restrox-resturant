@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
 import { protect, can, minRole } from '../../middlewares/auth.middleware.js';
+import { tenantContext } from '../../middlewares/tenant.middleware.js';
 import validate from '../../middlewares/validate.middleware.js';
 import {
   getMenuItems,
@@ -20,11 +21,11 @@ import {
 const router = Router();
 
 // ─── Analytics (before /:id to avoid param collision) ────────────────────────
-router.get('/analytics/margins', protect, minRole('manager'), getAllMargins);
-router.get('/analytics/category-summary', protect, minRole('manager'), getCategorySummary);
+router.get('/analytics/margins', protect, tenantContext, minRole('manager'), getAllMargins);
+router.get('/analytics/category-summary', protect, tenantContext, minRole('manager'), getCategorySummary);
 
 // ─── Menu Items ───────────────────────────────────────────────────────────────
-router.get('/', getMenuItems);       // public
+router.get('/', getMenuItems);       // public — no tenant filter (menus are browsable)
 router.get('/:id', getMenuItem);     // public
 
 const itemValidation = [
@@ -39,9 +40,9 @@ const itemValidation = [
   body('recipe.*.quantity').optional().isFloat({ min: 0.001 }).withMessage('Quantity must be > 0'),
 ];
 
-router.post('/', protect, can('menu:write'), itemValidation, validate, createMenuItem);
-router.put('/:id', protect, can('menu:write'), updateMenuItem);
-router.delete('/:id', protect, can('menu:delete'), deleteMenuItem);
+router.post('/', protect, tenantContext, can('menu:write'), itemValidation, validate, createMenuItem);
+router.put('/:id', protect, tenantContext, can('menu:write'), updateMenuItem);
+router.delete('/:id', protect, tenantContext, can('menu:delete'), deleteMenuItem);
 
 // ─── Recipe sub-resource ──────────────────────────────────────────────────────
 router.get('/:id/recipe', protect, can('menu:read'), getMenuItemRecipe);

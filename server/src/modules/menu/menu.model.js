@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { tenantFields, addTenantIndexes } from '../../plugins/tenantPlugin.js';
 
 const menuItemSchema = new mongoose.Schema(
   {
@@ -42,5 +43,9 @@ menuItemSchema.virtual('hasRecipe').get(function () {
 
 menuItemSchema.set('toJSON', { virtuals: true });
 menuItemSchema.set('toObject', { virtuals: true });
+
+// Menu items are restaurant-scoped (shared across branches by default)
+menuItemSchema.add(tenantFields(false));
+addTenantIndexes(menuItemSchema, false);
 
 export default mongoose.model('MenuItem', menuItemSchema);

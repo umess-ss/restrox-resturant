@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import User from './auth.model.js';
+import Restaurant from '../saas/restaurant.model.js';
 
 // ─── Token helpers ────────────────────────────────────────────────────────────
 
@@ -13,19 +14,39 @@ const signRefresh = (id, version) =>
     expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   });
 
-const sendTokens = (user, statusCode, res) => {
+const sendTokens = async (user, statusCode, res) => {
   const accessToken = signAccess(user._id);
   const refreshToken = signRefresh(user._id, user.tokenVersion);
 
-  // Refresh token in httpOnly cookie
   res.cookie('refreshToken', refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
-  res.status(statusCode).json({ accessToken, user: user.toPublic() });
+  // Include restaurant context in the login response so the frontend
+  // can set up the tenant store without an extra round-trip
+  let restaurantContext = null;
+  if (user.restaurant) {
+    const restaurant = await Restaurant.findById(user.restaurant).select('name slug plan features isActive planExpiresAt');
+    if (restaurant) {
+      restaurantContext = {
+        id: restaurant._id,
+        name: restaurant.name,
+        slug: restaurant.slug,
+        plan: restaurant.plan,
+        features: restaurant.features,
+        isActive: restaurant.isActive,
+      };
+    }
+  }
+
+  res.status(statusCode).json({
+    accessToken,
+    user: user.toPublic(),
+    restaurant: restaurantContext,
+  });
 };
 
 // ─── Controllers ─────────────────────────────────────────────────────────────
@@ -35,16 +56,20 @@ const sendTokens = (user, statusCode, res) => {
  * Public. Only admins can assign roles other than 'waiter'.
  */
 export const register = async (req, res) => {
-  const { name, email, password, role } = req.body;
+  const { name, email, password, role, branchId } = req.body;
 
   const exists = await User.findOne({ email });
   if (exists) return res.status(409).json({ message: 'Email already in use' });
 
-  // Non-admin registrations are always 'waiter'
+  // Role assignment: only admins within a restaurant can assign non-waiter roles
   const assignedRole = role && req.user?.role === 'admin' ? role : 'waiter';
 
-  const user = await User.create({ name, email, password, role: assignedRole });
-  sendTokens(user, 201, res);
+  // Inherit restaurant + branch from the creating admin, or from body if superadmin
+  const restaurant = req.user?.restaurant || req.body.restaurant || null;
+  const branch = branchId || req.user?.branch || null;
+
+  const user = await User.create({ name, email, password, role: assignedRole, restaurant, branch });
+  await sendTokens(user, 201, res);
 };
 
 /**
@@ -63,7 +88,7 @@ export const login = async (req, res) => {
     return res.status(403).json({ message: 'Account deactivated. Contact an administrator.' });
   }
 
-  sendTokens(user, 200, res);
+  await sendTokens(user, 200, res);
 };
 
 /**
@@ -123,7 +148,7 @@ export const changePassword = async (req, res) => {
   user.password = newPassword;
   await user.save(); // triggers pre-save hash + sets passwordChangedAt
 
-  sendTokens(user, 200, res);
+  await sendTokens(user, 200, res);
 };
 
 /**

@@ -13,7 +13,7 @@ import {
 
 export const getOrders = async (req, res) => {
   const { status, tableId, from, to, page = 1, limit = 30 } = req.query;
-  const filter = {};
+  const filter = { ...req.branchFilter }; // always scoped to restaurant+branch
   if (status) filter.status = status;
   if (tableId) filter.table = tableId;
   if (from || to) {
@@ -37,7 +37,7 @@ export const getOrders = async (req, res) => {
 };
 
 export const getOrder = async (req, res) => {
-  const order = await Order.findById(req.params.id)
+  const order = await Order.findOne({ _id: req.params.id, ...req.tenantFilter })
     .populate('table', 'number capacity location')
     .populate('waiter', 'name email role')
     .populate('items.menuItem', 'name category price')
@@ -51,10 +51,13 @@ export const getOrder = async (req, res) => {
  * Active orders for the kitchen display (confirmed + preparing + ready).
  */
 export const getKitchenOrders = async (req, res) => {
-  const orders = await Order.find({ status: { $in: ['confirmed', 'preparing', 'ready'] } })
+  const orders = await Order.find({
+    ...req.branchFilter,
+    status: { $in: ['confirmed', 'preparing', 'ready'] },
+  })
     .populate('table', 'number location')
     .populate('waiter', 'name')
-    .sort('createdAt'); // oldest first for kitchen
+    .sort('createdAt');
   res.json(orders);
 };
 
@@ -62,7 +65,15 @@ export const getKitchenOrders = async (req, res) => {
 
 export const createOrder = async (req, res) => {
   const { table, items, notes, taxRate } = req.body;
-  const order = await svcCreate({ tableId: table, itemInputs: items, notes, taxRate, userId: req.user._id });
+  const order = await svcCreate({
+    tableId: table,
+    itemInputs: items,
+    notes,
+    taxRate,
+    userId: req.user._id,
+    restaurantId: req.restaurantId,
+    branchId: req.branchId,
+  });
   res.status(201).json(order);
 };
 

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { tenantFields, addTenantIndexes } from '../../plugins/tenantPlugin.js';
 
 // ─── Sub-schemas ──────────────────────────────────────────────────────────────
 
@@ -79,11 +80,15 @@ const orderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// ─── Pre-save: generate orderNumber ──────────────────────────────────────────
+// ─── Tenant fields ────────────────────────────────────────────────────────────
+orderSchema.add(tenantFields(true)); // restaurant + branch scoped
+
+// ─── Pre-save: generate orderNumber scoped to restaurant ─────────────────────
 
 orderSchema.pre('save', async function (next) {
   if (this.isNew && !this.orderNumber) {
-    const count = await mongoose.model('Order').countDocuments();
+    // Scope order number to restaurant so ORD-0001 can exist in multiple restaurants
+    const count = await mongoose.model('Order').countDocuments({ restaurant: this.restaurant });
     this.orderNumber = `ORD-${String(count + 1).padStart(4, '0')}`;
   }
   next();
@@ -93,5 +98,6 @@ orderSchema.pre('save', async function (next) {
 
 orderSchema.index({ table: 1, status: 1 });
 orderSchema.index({ createdAt: -1 });
+addTenantIndexes(orderSchema, true);
 
 export default mongoose.model('Order', orderSchema);

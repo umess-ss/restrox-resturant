@@ -2,20 +2,54 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { ROLES } from '../../config/roles.js';
 
+// System-level roles (platform operations, not restaurant-level)
+export const SYSTEM_ROLES = Object.freeze({
+  SUPERADMIN: 'superadmin', // platform operator — can see all restaurants
+  USER:       'user',       // normal restaurant staff
+});
+
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true, minlength: 6, select: false },
+
+    // Restaurant-level role (chef, waiter, manager, admin)
     role: {
       type: String,
       enum: Object.values(ROLES),
       default: ROLES.WAITER,
     },
+
+    // Platform-level role
+    systemRole: {
+      type: String,
+      enum: Object.values(SYSTEM_ROLES),
+      default: SYSTEM_ROLES.USER,
+    },
+
+    // ─── Tenant fields ────────────────────────────────────────────────────────
+    // Which restaurant this user belongs to (null for superadmins)
+    restaurant: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Restaurant',
+      index: true,
+    },
+    // Which branch this user is primarily assigned to (null = all branches)
+    branch: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Branch',
+      index: true,
+    },
+    // Managers/admins can be granted access to multiple branches
+    allowedBranches: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Branch',
+    }],
+
     isActive: { type: Boolean, default: true },
-    // Stores the iat of the last issued token — invalidates all older tokens on logout/pw change
     passwordChangedAt: { type: Date },
-    tokenVersion: { type: Number, default: 0 }, // bump to invalidate all refresh tokens
+    tokenVersion: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
@@ -28,12 +62,10 @@ userSchema.pre('save', async function (next) {
   next();
 });
 
-// Compare plain password to hash
 userSchema.methods.matchPassword = function (entered) {
   return bcrypt.compare(entered, this.password);
 };
 
-// Returns true if JWT was issued before the password was changed
 userSchema.methods.changedPasswordAfter = function (jwtIssuedAt) {
   if (this.passwordChangedAt) {
     return Math.floor(this.passwordChangedAt.getTime() / 1000) > jwtIssuedAt;
@@ -41,13 +73,15 @@ userSchema.methods.changedPasswordAfter = function (jwtIssuedAt) {
   return false;
 };
 
-// Safe public projection
 userSchema.methods.toPublic = function () {
   return {
     id: this._id,
     name: this.name,
     email: this.email,
     role: this.role,
+    systemRole: this.systemRole,
+    restaurant: this.restaurant,
+    branch: this.branch,
     isActive: this.isActive,
     createdAt: this.createdAt,
   };

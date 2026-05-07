@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { getTables, getTable, createTable, updateTable, deleteTable, getTableOrder } from './table.controller.js';
 import { protect, can } from '../../middlewares/auth.middleware.js';
+import { tenantContext } from '../../middlewares/tenant.middleware.js';
 
 const router = Router();
-router.use(protect);
+router.use(protect, tenantContext);
 
 router.get('/', can('tables:read'), getTables);
 router.get('/:id', can('tables:read'), getTable);

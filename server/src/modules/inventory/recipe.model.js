@@ -1,8 +1,10 @@
 import mongoose from 'mongoose';
+import { tenantFields, addTenantIndexes } from '../../plugins/tenantPlugin.js';
 
 /**
  * Maps a MenuItem to the ingredients it consumes when served.
  * One recipe per menu item (upsert on menuItem).
+ * Restaurant-scoped — recipes belong to the restaurant, not a branch.
  */
 const recipeIngredientSchema = new mongoose.Schema(
   {
@@ -37,5 +39,9 @@ const recipeSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Restaurant-scoped — unique recipe per menuItem per restaurant
+recipeSchema.add(tenantFields(false));
+addTenantIndexes(recipeSchema, false);
 
 export default mongoose.model('Recipe', recipeSchema);

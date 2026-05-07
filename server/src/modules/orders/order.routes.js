@@ -1,23 +1,15 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
 import { protect, can, authorize } from '../../middlewares/auth.middleware.js';
+import { tenantContext } from '../../middlewares/tenant.middleware.js';
 import validate from '../../middlewares/validate.middleware.js';
 import {
-  getOrders,
-  getOrder,
-  getKitchenOrders,
-  createOrder,
-  addItems,
-  updateOrderStatus,
-  printKOT,
-  getBill,
-  checkoutOrder,
-  cancelOrder,
-  updateItemStatus,
+  getOrders, getOrder, getKitchenOrders, createOrder, addItems,
+  updateOrderStatus, printKOT, getBill, checkoutOrder, cancelOrder, updateItemStatus,
 } from './order.controller.js';
 
 const router = Router();
-router.use(protect);
+router.use(protect, tenantContext); // all order routes require tenant context
 
 // ─── Kitchen display (before /:id) ───────────────────────────────────────────
 router.get('/kitchen', can('orders:read'), getKitchenOrders);

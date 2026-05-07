@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { ROLES } from '../../config/roles.js';
+import { tenantFields, addTenantIndexes } from '../../plugins/tenantPlugin.js';
 
 const emergencyContactSchema = new mongoose.Schema(
   {
@@ -70,10 +71,15 @@ const staffProfileSchema = new mongoose.Schema(
 // Auto-generate employeeId on first save
 staffProfileSchema.pre('save', async function (next) {
   if (this.isNew && !this.employeeId) {
-    const count = await mongoose.model('StaffProfile').countDocuments();
+    // Scope employee ID to restaurant
+    const count = await mongoose.model('StaffProfile').countDocuments({ restaurant: this.restaurant });
     this.employeeId = `EMP-${String(count + 1).padStart(4, '0')}`;
   }
   next();
 });
+
+// Staff profiles are branch-scoped
+staffProfileSchema.add(tenantFields(true));
+addTenantIndexes(staffProfileSchema, true);
 
 export default mongoose.model('StaffProfile', staffProfileSchema);
