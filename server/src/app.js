@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
 
 import authRoutes from './modules/auth/auth.routes.js';
 import menuRoutes from './modules/menu/menu.routes.js';
@@ -16,6 +17,7 @@ const app = express();
 // Security & parsing
 app.use(helmet());
 app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
@@ -23,6 +25,15 @@ app.use(morgan('dev'));
 // Rate limiting
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 app.use('/api', limiter);
+
+// Stricter limiter for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 min
+  max: 20,
+  message: { message: 'Too many auth attempts, please try again later' },
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
 
 // Routes
 app.use('/api/auth', authRoutes);

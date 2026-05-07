@@ -9,7 +9,7 @@ import TablesPage from './pages/TablesPage.jsx';
 import StaffPage from './pages/StaffPage.jsx';
 
 const PrivateRoute = ({ children }) => {
-  const token = useAuthStore((s) => s.token);
+  const token = useAuthStore((s) => s.accessToken);
   return token ? children : <Navigate to="/login" replace />;
 };
 

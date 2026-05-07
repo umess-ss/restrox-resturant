@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { getMenuItems, getMenuItem, createMenuItem, updateMenuItem, deleteMenuItem } from './menu.controller.js';
-import { protect, authorize } from '../../middlewares/auth.middleware.js';
+import { protect, can } from '../../middlewares/auth.middleware.js';
 
 const router = Router();
 
-router.get('/', getMenuItems);
-router.get('/:id', getMenuItem);
-router.post('/', protect, authorize('admin', 'manager'), createMenuItem);
-router.put('/:id', protect, authorize('admin', 'manager'), updateMenuItem);
-router.delete('/:id', protect, authorize('admin'), deleteMenuItem);
+router.get('/', getMenuItems);                                    // public
+router.get('/:id', getMenuItem);                                  // public
+router.post('/', protect, can('menu:write'), createMenuItem);
+router.put('/:id', protect, can('menu:write'), updateMenuItem);
+router.delete('/:id', protect, can('menu:delete'), deleteMenuItem);
 
 export default router;
