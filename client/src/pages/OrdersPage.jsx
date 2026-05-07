@@ -9,7 +9,7 @@ import {
   checkoutOrder,
   cancelOrder,
 } from '../api/orders.api.js';
-import useSocket from '../hooks/useSocket.js';
+import { useSocketContext, useOrderEvents } from '../socket/SocketContext.jsx';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -271,7 +271,7 @@ export default function OrdersPage() {
   const [view, setView] = useState('orders'); // 'orders' | 'kitchen'
   const [statusFilter, setStatusFilter] = useState('');
   const [billOrderId, setBillOrderId] = useState(null);
-  const { socket, connected } = useSocket();
+  const { connected } = useSocketContext();
 
   const load = useCallback(async () => {
     try {
@@ -288,25 +288,14 @@ export default function OrdersPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Auto-refresh every 30s
+  // Fallback polling every 60s (socket is primary)
   useEffect(() => {
-    const t = setInterval(load, 30000);
+    const t = setInterval(load, 60000);
     return () => clearInterval(t);
   }, [load]);
 
-  // Real-time socket updates
-  useEffect(() => {
-    if (!socket) return;
-    const refresh = () => load();
-    socket.on('order:created', refresh);
-    socket.on('order:status_changed', refresh);
-    socket.on('order:item_status_changed', refresh);
-    return () => {
-      socket.off('order:created', refresh);
-      socket.off('order:status_changed', refresh);
-      socket.off('order:item_status_changed', refresh);
-    };
-  }, [socket, load]);
+  // Real-time updates — reload list on any order event
+  useOrderEvents(() => { load(); }, [load]);
 
   const advance = async (id, current) => {
     try {

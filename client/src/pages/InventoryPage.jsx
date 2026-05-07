@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import {
   fetchIngredients,
@@ -8,6 +8,7 @@ import {
   reportWastage,
   fetchStockSummary,
 } from '../api/inventory.api.js';
+import { useInventoryEvents } from '../socket/SocketContext.jsx';
 
 const UNITS = ['kg', 'g', 'l', 'ml', 'pcs', 'dozen', 'box'];
 const WASTAGE_REASONS = ['expired', 'spoiled', 'damaged', 'spillage', 'other'];
@@ -115,7 +116,14 @@ export default function InventoryPage() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
+
+  // Live stock updates — patch the ingredient in place without full reload
+  useInventoryEvents((updated) => {
+    setIngredients((prev) =>
+      prev.map((i) => i._id === updated._id ? { ...i, ...updated } : i)
+    );
+  }, []);
 
   const displayed = ingredients.filter((i) => {
     const matchSearch = i.name.toLowerCase().includes(search.toLowerCase());

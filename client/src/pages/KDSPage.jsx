@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { fetchKitchenOrders, updateItemStatus, updateOrderStatus } from '../api/orders.api.js';
-import useSocket from '../hooks/useSocket.js';
+import { useSocketContext, useOrderEvents } from '../socket/SocketContext.jsx';
+import { EVENTS } from '../socket/events.js';
 
 // ─── Aging helpers ────────────────────────────────────────────────────────────
 
@@ -191,7 +192,7 @@ function Column({ title, color, orders, onUpdate }) {
 export default function KDSPage() {
   const [orders, setOrders] = useState([]);
   const [lastUpdate, setLastUpdate] = useState(null);
-  const { socket, connected } = useSocket();
+  const { connected } = useSocketContext();
   const loadRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -208,47 +209,23 @@ export default function KDSPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Socket.IO real-time updates
-  useEffect(() => {
-    if (!socket) return;
+  // Real-time order updates via shared socket context
+  useOrderEvents((event, updatedOrder) => {
+    setOrders((prev) => {
+      const kitchenStatuses = ['confirmed', 'preparing', 'ready'];
 
-    const handleUpdate = (updatedOrder) => {
-      setOrders((prev) => {
-        const kitchenStatuses = ['confirmed', 'preparing', 'ready'];
-        const exists = prev.find((o) => o._id === updatedOrder._id);
+      if (!kitchenStatuses.includes(updatedOrder.status)) {
+        return prev.filter((o) => o._id !== updatedOrder._id);
+      }
 
-        if (!kitchenStatuses.includes(updatedOrder.status)) {
-          // Remove from KDS if order left kitchen (served/paid/cancelled)
-          return prev.filter((o) => o._id !== updatedOrder._id);
-        }
-
-        if (exists) {
-          // Update in place
-          return prev.map((o) => o._id === updatedOrder._id ? { ...o, ...updatedOrder } : o);
-        } else {
-          // New order arrived in kitchen
-          return [...prev, updatedOrder].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-        }
-      });
-      setLastUpdate(new Date());
-    };
-
-    socket.on('order:created', handleUpdate);
-    socket.on('order:updated', handleUpdate);
-    socket.on('order:status_changed', handleUpdate);
-    socket.on('order:item_status_changed', handleUpdate);
-    socket.on('order:kot_printed', handleUpdate);
-    socket.on('order:items_added', handleUpdate);
-
-    return () => {
-      socket.off('order:created', handleUpdate);
-      socket.off('order:updated', handleUpdate);
-      socket.off('order:status_changed', handleUpdate);
-      socket.off('order:item_status_changed', handleUpdate);
-      socket.off('order:kot_printed', handleUpdate);
-      socket.off('order:items_added', handleUpdate);
-    };
-  }, [socket]);
+      const exists = prev.find((o) => o._id === updatedOrder._id);
+      if (exists) {
+        return prev.map((o) => o._id === updatedOrder._id ? { ...o, ...updatedOrder } : o);
+      }
+      return [...prev, updatedOrder].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    });
+    setLastUpdate(new Date());
+  }, []);
 
   const confirmed = orders.filter((o) => o.status === 'confirmed');
   const preparing = orders.filter((o) => o.status === 'preparing');

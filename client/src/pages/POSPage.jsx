@@ -3,7 +3,8 @@ import { toast } from 'react-toastify';
 import { fetchTables } from '../api/tables.api.js';
 import { fetchMenuItems } from '../api/menu.api.js';
 import { createOrder, addItemsToOrder, printKOT } from '../api/orders.api.js';
-import useSocket from '../hooks/useSocket.js';
+import { useSocketContext, useOrderEvents, useTableEvents } from '../socket/SocketContext.jsx';
+import { EVENTS } from '../socket/events.js';
 
 const CATEGORY_ICONS = {
   appetizer: '🥗', main: '🍽️', dessert: '🍰', beverage: '🥤', special: '⭐',
@@ -86,7 +87,7 @@ export default function POSPage() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
-  const { socket, connected } = useSocket();
+  const { connected, joinOrder, leaveOrder } = useSocketContext();
 
   const load = useCallback(async () => {
     const [t, m] = await Promise.all([fetchTables(), fetchMenuItems()]);
@@ -96,28 +97,38 @@ export default function POSPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Live table status updates — update table chips without full reload
+  useTableEvents((updatedTable) => {
+    setTables((prev) =>
+      prev.map((t) => t._id === updatedTable._id ? { ...t, ...updatedTable } : t)
+    );
+  }, []);
+
   // Listen for real-time order status changes on the active order
+  useOrderEvents((event, updated) => {
+    if (!activeOrder?._id || updated._id !== activeOrder._id) return;
+
+    setActiveOrder(updated);
+
+    if (event === EVENTS.ORDER_ITEM_STATUS_CHANGED) {
+      const allReady = updated.items?.every((i) => i.itemStatus === 'ready');
+      if (allReady) toast.info(`🍽 All items ready for ${updated.orderNumber}`);
+    }
+    if (updated.status === 'ready') {
+      toast.success(`✅ Order ${updated.orderNumber} is ready for pickup!`, { autoClose: false });
+    }
+    if (event === EVENTS.ORDER_PAID || event === EVENTS.ORDER_CANCELLED) {
+      setActiveOrder(null);
+      load();
+    }
+  }, [activeOrder?._id]);
+
+  // Join/leave the active order room when it changes
   useEffect(() => {
-    if (!socket || !activeOrder?._id) return;
-    socket.emit('join:order', activeOrder._id);
-
-    const handleUpdate = (updated) => {
-      if (updated._id === activeOrder._id || updated._id === activeOrder) {
-        setActiveOrder(updated);
-        if (updated.status === 'ready') toast.success(`Order ${updated.orderNumber} is ready!`);
-        if (updated.status === 'paid') { setActiveOrder(null); load(); }
-      }
-    };
-
-    socket.on('order:status_changed', handleUpdate);
-    socket.on('order:item_status_changed', handleUpdate);
-
-    return () => {
-      socket.emit('leave:order', activeOrder._id);
-      socket.off('order:status_changed', handleUpdate);
-      socket.off('order:item_status_changed', handleUpdate);
-    };
-  }, [socket, activeOrder?._id]);
+    if (!activeOrder?._id) return;
+    joinOrder(activeOrder._id);
+    return () => leaveOrder(activeOrder._id);
+  }, [activeOrder?._id, joinOrder, leaveOrder]);
 
   const selectTable = (table) => {
     setSelectedTable(table);

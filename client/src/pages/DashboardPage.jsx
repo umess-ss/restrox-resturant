@@ -11,6 +11,7 @@ import {
   fetchStaffPerformance, fetchPaymentMethods,
 } from '../api/analytics.api.js';
 import useAuthStore from '../store/authStore.js';
+import { useAnalyticsEvents } from '../socket/SocketContext.jsx';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 
@@ -382,22 +383,22 @@ export default function DashboardPage() {
   const load = useCallback(async () => {
     try {
       if (isManager) {
-        const [snap, staff, payroll] = await Promise.all([
+        const [snap, staff] = await Promise.all([
           fetchSnapshot(),
           fetchStaffPerformance(),
-          // payroll cost from staff performance endpoint
-          Promise.resolve(null),
         ]);
         setSnapshot(snap);
         setStaffData(staff);
       }
     } catch (err) {
-      // Non-managers get a 403 — show basic view
       if (err.response?.status !== 403) toast.error('Failed to load analytics');
     }
   }, [isManager]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Live dashboard refresh when an order is paid
+  useAnalyticsEvents(() => { load(); }, [load]);
 
   // Non-manager: simple view
   if (!isManager) {

@@ -4,6 +4,8 @@ import StockTransaction from './stockTransaction.model.js';
 import Wastage from './wastage.model.js';
 import Recipe from './recipe.model.js';
 import logger from '../../config/logger.js';
+import { getIO } from '../../socket/io.js';
+import { emitLowStockAlert, emitStockUpdate } from '../../socket/index.js';
 
 /**
  * Core stock mutation helper.
@@ -67,11 +69,13 @@ export const applyStockDelta = async ({
 
     if (ownSession) await s.commitTransaction();
 
-    // Emit low-stock warning to the logger (can be swapped for email/push later)
+    const io = getIO();
+    // Emit stock update to kitchen + managers
+    emitStockUpdate(io, ingredient);
+    // Emit low-stock alert to managers only
     if (ingredient.isLowStock) {
-      logger.warn(
-        `LOW STOCK ALERT: "${ingredient.name}" is at ${newQty} ${ingredient.unit} (threshold: ${ingredient.threshold})`
-      );
+      emitLowStockAlert(io, ingredient);
+      logger.warn(`LOW STOCK: "${ingredient.name}" at ${newQty} ${ingredient.unit} (threshold: ${ingredient.threshold})`);
     }
 
     return { ingredient, transaction };

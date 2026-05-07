@@ -5,7 +5,8 @@ import MenuItem from '../menu/menu.model.js';
 import { deductRecipeIngredients } from '../inventory/inventory.service.js';
 import logger from '../../config/logger.js';
 import { getIO } from '../../socket/io.js';
-import { emitOrderUpdate } from '../../socket/index.js';
+import { emitOrderEvent, emitTableEvent, emitAnalyticsUpdate } from '../../socket/index.js';
+import { EVENTS } from '../../socket/events.js';
 
 // ─── Status machine ───────────────────────────────────────────────────────────
 
@@ -101,7 +102,9 @@ export const createOrder = async ({ tableId, itemInputs, notes, taxRate, userId 
     await table.save({ session });
 
     await session.commitTransaction();
-    emitOrderUpdate(getIO(), order, 'order:created');
+    emitOrderEvent(getIO(), order, EVENTS.ORDER_CREATED);
+    // Notify POS that table status changed to occupied
+    emitTableEvent(getIO(), { _id: table._id, number: table.number, status: 'occupied', currentOrder: order._id, location: table.location });
     return order;
   } catch (err) {
     await session.abortTransaction();
@@ -146,7 +149,7 @@ export const addItemsToOrder = async (orderId, itemInputs, userId) => {
   });
   Object.assign(order, financials);
   await order.save();
-  emitOrderUpdate(getIO(), order, 'order:items_added');
+  emitOrderEvent(getIO(), order, EVENTS.ORDER_ITEMS_ADDED);
   return order;
 };
 
@@ -182,13 +185,26 @@ export const transitionStatus = async (orderId, newStatus, userId, note) => {
 
   // Free the table when order is paid or cancelled
   if (['paid', 'cancelled'].includes(newStatus)) {
-    await Table.findByIdAndUpdate(order.table, {
+    const table = await Table.findByIdAndUpdate(order.table, {
       status: 'cleaning',
       currentOrder: null,
-    });
+    }, { new: true });
+    if (table) emitTableEvent(getIO(), table);
   }
 
-  emitOrderUpdate(getIO(), order, 'order:status_changed');
+  // Determine the specific event name for precise client-side handling
+  const eventMap = {
+    paid:      EVENTS.ORDER_PAID,
+    cancelled: EVENTS.ORDER_CANCELLED,
+  };
+  const event = eventMap[newStatus] || EVENTS.ORDER_STATUS_CHANGED;
+  emitOrderEvent(getIO(), order, event);
+
+  // Push analytics snapshot to dashboard after payment
+  if (newStatus === 'paid') {
+    emitAnalyticsUpdate(getIO(), { trigger: 'order_paid', orderId: order._id, totalAmount: order.totalAmount });
+  }
+
   return order;
 };
 
@@ -223,7 +239,7 @@ export const generateKOT = async (orderId, userId) => {
 
   await order.save();
 
-  emitOrderUpdate(getIO(), order, 'order:kot_printed');
+  emitOrderEvent(getIO(), order, EVENTS.ORDER_KOT_PRINTED);
 
   return {
     kotNumber: order.kotNumber,
@@ -263,7 +279,7 @@ export const updateItemStatus = async (orderId, itemId, newStatus, userId) => {
   }
 
   await order.save();
-  emitOrderUpdate(getIO(), order, 'order:item_status_changed');
+  emitOrderEvent(getIO(), order, EVENTS.ORDER_ITEM_STATUS_CHANGED);
   return order;
 };
 
