@@ -39,7 +39,7 @@ const orderSchema = new mongoose.Schema(
     orderNumber: { type: String, unique: true },
 
     table: { type: mongoose.Schema.Types.ObjectId, ref: 'Table', required: true },
-    waiter: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    waiter: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // null for QR orders
 
     items: { type: [orderItemSchema], validate: { validator: (v) => v.length > 0, message: 'Order must have at least one item' } },
 
@@ -71,6 +71,10 @@ const orderSchema = new mongoose.Schema(
 
     // Inventory
     inventoryDeducted: { type: Boolean, default: false },
+
+    // Customer QR ordering
+    source: { type: String, enum: ['pos', 'qr'], default: 'pos' },
+    customerName: { type: String, trim: true },
 
     // Audit trail
     statusHistory: [statusHistorySchema],

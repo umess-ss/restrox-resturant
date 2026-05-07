@@ -100,7 +100,7 @@ export const createOrder = async ({ tableId, itemInputs, notes, taxRate, userId,
         taxRate: taxRate ?? 0.1,
         ...financials,
         notes,
-        statusHistory: [{ status: 'pending', changedBy: userId }],
+        statusHistory: [{ status: 'pending', changedBy: userId || undefined }],
       }],
       { session }
     );
