@@ -263,7 +263,8 @@ export const createCustomerOrder = async ({
 
 /**
  * Returns the public-safe status of an order.
- * Never exposes: financials, staff IDs, inventory, internal notes, admin data.
+ * Includes estimated preparation time calculated from menu item preparationTime fields.
+ * Never exposes: financials breakdown, staff IDs, inventory, internal notes, admin data.
  */
 export const getOrderStatus = async (orderId) => {
   assertObjectId(orderId, 'orderId');
@@ -271,9 +272,34 @@ export const getOrderStatus = async (orderId) => {
   const order = await Order.findById(orderId)
     .select('orderNumber status paymentStatus kotNumber totalAmount createdAt items source')
     .populate('table', 'number')
+    .populate('items.menuItem', 'preparationTime') // only prep time — no cost/recipe fields
     .lean();
 
   if (!order) throw Object.assign(new Error('Order not found'), { status: 404 });
+
+  // ── Estimate preparation time ──────────────────────────────────────────────
+  // Formula: max(preparationTime) across all items, with a small quantity factor.
+  // If no preparationTime data, default to 15 minutes.
+  const ACTIVE_STATUSES = ['pending', 'confirmed', 'preparing'];
+  let estimatedPreparationTime = null;
+  let estimatedReadyAt = null;
+
+  if (ACTIVE_STATUSES.includes(order.status)) {
+    const times = order.items
+      .map((i) => {
+        const base = i.menuItem?.preparationTime || 15;
+        // Add 2 min per extra item beyond the first (parallel kitchen work)
+        const quantityFactor = Math.ceil((i.quantity - 1) * 0.5);
+        return base + quantityFactor;
+      })
+      .filter((t) => t > 0);
+
+    if (times.length > 0) {
+      estimatedPreparationTime = Math.max(...times); // kitchen works in parallel
+      const createdMs = new Date(order.createdAt).getTime();
+      estimatedReadyAt = new Date(createdMs + estimatedPreparationTime * 60 * 1000).toISOString();
+    }
+  }
 
   return {
     orderId: order._id,
@@ -291,6 +317,8 @@ export const getOrderStatus = async (orderId) => {
       itemStatus: i.itemStatus,
     })),
     createdAt: order.createdAt,
+    estimatedPreparationTime, // minutes, null if not applicable
+    estimatedReadyAt,          // ISO string, null if not applicable
   };
 };
 

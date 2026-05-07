@@ -36,6 +36,84 @@ const ITEM_STATUS_STYLES = {
   ready:     'bg-green-100 text-green-700',
 };
 
+// ─── Prep time helpers ────────────────────────────────────────────────────────
+
+/**
+ * Returns minutes remaining until estimatedReadyAt.
+ * Returns null if already past or no estimate.
+ */
+const getMinsRemaining = (estimatedReadyAt) => {
+  if (!estimatedReadyAt) return null;
+  const diff = new Date(estimatedReadyAt) - Date.now();
+  if (diff <= 0) return 0;
+  return Math.ceil(diff / 60000);
+};
+
+function PrepTimeCard({ order }) {
+  const [minsLeft, setMinsLeft] = useState(() => getMinsRemaining(order.estimatedReadyAt));
+
+  // Tick every minute
+  useEffect(() => {
+    if (!order.estimatedReadyAt) return;
+    const t = setInterval(() => setMinsLeft(getMinsRemaining(order.estimatedReadyAt)), 60000);
+    return () => clearInterval(t);
+  }, [order.estimatedReadyAt]);
+
+  // Update when order changes (e.g. socket update)
+  useEffect(() => {
+    setMinsLeft(getMinsRemaining(order.estimatedReadyAt));
+  }, [order.estimatedReadyAt, order.status]);
+
+  if (order.status === 'ready') {
+    return (
+      <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center gap-3">
+        <span className="text-2xl">🔔</span>
+        <div>
+          <p className="font-bold text-green-700">Your order is ready!</p>
+          <p className="text-sm text-green-600">A waiter will bring it to your table.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (['served', 'paid', 'cancelled'].includes(order.status)) return null;
+
+  if (!order.estimatedPreparationTime) {
+    return (
+      <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex items-center gap-3">
+        <span className="text-2xl">👨‍🍳</span>
+        <p className="text-sm text-orange-700 font-medium">Kitchen is preparing your order</p>
+      </div>
+    );
+  }
+
+  const readyTime = order.estimatedReadyAt
+    ? new Date(order.estimatedReadyAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : null;
+
+  return (
+    <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4">
+      <div className="flex items-center gap-3">
+        <span className="text-2xl">⏱️</span>
+        <div className="flex-1">
+          <p className="font-bold text-orange-700">
+            {minsLeft !== null && minsLeft > 0
+              ? `~${minsLeft} min${minsLeft !== 1 ? 's' : ''} remaining`
+              : minsLeft === 0
+              ? 'Almost ready!'
+              : `~${order.estimatedPreparationTime} mins`}
+          </p>
+          {readyTime && (
+            <p className="text-xs text-orange-600 mt-0.5">
+              Estimated ready by {readyTime}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function CustomerOrderStatusPage() {
@@ -137,6 +215,9 @@ export default function CustomerOrderStatusPage() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 space-y-5 mt-5">
+
+        {/* Estimated prep time */}
+        <PrepTimeCard order={order} />
 
         {/* Timeline */}
         {order.status !== 'cancelled' && (
