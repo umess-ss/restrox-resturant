@@ -3,7 +3,7 @@ import { tenantFields, addTenantIndexes } from '../../plugins/tenantPlugin.js';
 
 const tableSchema = new mongoose.Schema(
   {
-    number: { type: Number, required: true, unique: true },
+    number: { type: Number, required: true }, // unique enforced by compound index below
     capacity: { type: Number, required: true, min: 1 },
     status: {
       type: String,

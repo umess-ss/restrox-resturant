@@ -8,6 +8,7 @@ import mongoose from 'mongoose';
 import User from './modules/auth/auth.model.js';
 import MenuItem from './modules/menu/menu.model.js';
 import Table from './modules/tables/table.model.js';
+import Order from './modules/orders/order.model.js';
 import Ingredient from './modules/inventory/ingredient.model.js';
 import Recipe from './modules/inventory/recipe.model.js';
 import StaffProfile from './modules/staff/staffProfile.model.js';
@@ -127,12 +128,85 @@ const TABLES = [
   { number: 11, capacity: 2, location: 'bar'     },
 ];
 
+// Patch old tables that are missing restaurant/branch (migration)
+const tablesWithoutTenant = await Table.find({
+  $or: [{ restaurant: { $exists: false } }, { restaurant: null }],
+});
+if (tablesWithoutTenant.length > 0) {
+  await Table.updateMany(
+    { $or: [{ restaurant: { $exists: false } }, { restaurant: null }] },
+    { $set: { restaurant: restaurant._id, branch: branch._id } }
+  );
+  logger.info(`Patched ${tablesWithoutTenant.length} tables with tenant fields`);
+}
+
+// Create any missing tables (check by restaurant+branch+number to avoid duplicates)
 for (const t of TABLES) {
-  const exists = await Table.findOne({ number: t.number });
+  const exists = await Table.findOne({
+    restaurant: restaurant._id,
+    branch: branch._id,
+    number: t.number,
+  });
   if (!exists) {
-    await Table.create(t);
+    await Table.create({ ...t, restaurant: restaurant._id, branch: branch._id });
     logger.info(`Created table: ${t.number}`);
   }
+}
+
+// ─── 3b. Migrate old orders missing tenant fields ────────────────────────────
+
+const ordersWithoutTenant = await Order.countDocuments({
+  $or: [{ restaurant: { $exists: false } }, { restaurant: null }],
+});
+if (ordersWithoutTenant > 0) {
+  await Order.updateMany(
+    { $or: [{ restaurant: { $exists: false } }, { restaurant: null }] },
+    { $set: { restaurant: restaurant._id, branch: branch._id } }
+  );
+  logger.info(`Patched ${ordersWithoutTenant} orders with tenant fields`);
+} else {
+  logger.info('Orders: all have tenant fields');
+}
+
+// ─── 3c. Migrate menu items, ingredients, recipes missing restaurant field ───
+
+const menuWithout = await MenuItem.countDocuments({
+  $or: [{ restaurant: { $exists: false } }, { restaurant: null }],
+});
+if (menuWithout > 0) {
+  await MenuItem.updateMany(
+    { $or: [{ restaurant: { $exists: false } }, { restaurant: null }] },
+    { $set: { restaurant: restaurant._id } }
+  );
+  logger.info(`Patched ${menuWithout} menu items with restaurant field`);
+} else {
+  logger.info('Menu items: all have restaurant field');
+}
+
+const ingWithout = await Ingredient.countDocuments({
+  $or: [{ restaurant: { $exists: false } }, { restaurant: null }],
+});
+if (ingWithout > 0) {
+  await Ingredient.updateMany(
+    { $or: [{ restaurant: { $exists: false } }, { restaurant: null }] },
+    { $set: { restaurant: restaurant._id, branch: branch._id } }
+  );
+  logger.info(`Patched ${ingWithout} ingredients with tenant fields`);
+} else {
+  logger.info('Ingredients: all have tenant fields');
+}
+
+const recipesWithout = await Recipe.countDocuments({
+  $or: [{ restaurant: { $exists: false } }, { restaurant: null }],
+});
+if (recipesWithout > 0) {
+  await Recipe.updateMany(
+    { $or: [{ restaurant: { $exists: false } }, { restaurant: null }] },
+    { $set: { restaurant: restaurant._id } }
+  );
+  logger.info(`Patched ${recipesWithout} recipes with restaurant field`);
+} else {
+  logger.info('Recipes: all have restaurant field');
 }
 
 // ─── 4. Ingredients ───────────────────────────────────────────────────────────

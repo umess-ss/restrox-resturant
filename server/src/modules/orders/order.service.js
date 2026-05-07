@@ -58,16 +58,22 @@ export const createOrder = async ({ tableId, itemInputs, notes, taxRate, userId,
   session.startTransaction();
 
   try {
-    // Validate table — must belong to same restaurant+branch
-    const table = await Table.findOne({ _id: tableId, restaurant: restaurantId }).session(session);
+    // Validate table — scope to restaurant when available, fall back to ID-only for legacy users
+    const tableQuery = restaurantId
+      ? { _id: tableId, restaurant: restaurantId }
+      : { _id: tableId };
+    const table = await Table.findOne(tableQuery).session(session);
     if (!table) throw Object.assign(new Error('Table not found'), { status: 404 });
     if (table.status === 'occupied') {
       throw Object.assign(new Error(`Table ${table.number} is already occupied`), { status: 409 });
     }
 
-    // Validate + snapshot menu items — must belong to same restaurant
+    // Validate + snapshot menu items — scope to restaurant when available
     const menuIds = itemInputs.map((i) => i.menuItem);
-    const menuItems = await MenuItem.find({ _id: { $in: menuIds }, isAvailable: true, restaurant: restaurantId }).session(session);
+    const menuQuery = restaurantId
+      ? { _id: { $in: menuIds }, isAvailable: true, restaurant: restaurantId }
+      : { _id: { $in: menuIds }, isAvailable: true };
+    const menuItems = await MenuItem.find(menuQuery).session(session);
     const menuMap = new Map(menuItems.map((m) => [m._id.toString(), m]));
 
     const items = itemInputs.map((input) => {
@@ -78,8 +84,9 @@ export const createOrder = async ({ tableId, itemInputs, notes, taxRate, userId,
 
     const financials = calcFinancials(items, { taxRate });
 
-    // Generate KOT number
-    const orderCount = await Order.countDocuments().session(session);
+    // Generate KOT number — scope to restaurant when available
+    const kotCountQuery = restaurantId ? { restaurant: restaurantId } : {};
+    const orderCount = await Order.countDocuments(kotCountQuery).session(session);
     const kotNumber = `KOT-${String(orderCount + 1).padStart(4, '0')}`;
 
     const [order] = await Order.create(
