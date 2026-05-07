@@ -1,0 +1,422 @@
+{
+  "info": {
+    "name": "RMS — P0 Auth & RBAC Tests",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "BASE_URL",      "value": "http://localhost:5000/api" },
+    { "key": "adminToken",    "value": "" },
+    { "key": "managerToken",  "value": "" },
+    { "key": "waiterToken",   "value": "" },
+    { "key": "chefToken",     "value": "" }
+  ],
+  "item": [
+
+    {
+      "name": "1. Login Tests",
+      "item": [
+        {
+          "name": "A01 — Admin Login (expect 200)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Has accessToken', () => { const b = pm.response.json(); pm.expect(b).to.have.property('accessToken'); pm.collectionVariables.set('adminToken', b.accessToken); });",
+            "pm.test('User role is admin', () => pm.expect(pm.response.json().user.role).to.eql('admin'));",
+            "pm.test('No password in response', () => pm.expect(JSON.stringify(pm.response.json())).to.not.include('password'));"
+          ]}}],
+          "request": { "method": "POST", "url": "{{BASE_URL}}/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"email\":\"admin@rms.com\",\"password\":\"admin123\"}" }
+          }
+        },
+        {
+          "name": "A02 — Manager Login (expect 200)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Role is manager', () => pm.expect(pm.response.json().user.role).to.eql('manager'));",
+            "const b = pm.response.json(); pm.collectionVariables.set('managerToken', b.accessToken);"
+          ]}}],
+          "request": { "method": "POST", "url": "{{BASE_URL}}/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"email\":\"manager@rms.com\",\"password\":\"manager123\"}" }
+          }
+        },
+        {
+          "name": "A03 — Waiter Login (expect 200)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Role is waiter', () => pm.expect(pm.response.json().user.role).to.eql('waiter'));",
+            "const b = pm.response.json(); pm.collectionVariables.set('waiterToken', b.accessToken);"
+          ]}}],
+          "request": { "method": "POST", "url": "{{BASE_URL}}/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"email\":\"waiter@rms.com\",\"password\":\"waiter123\"}" }
+          }
+        },
+        {
+          "name": "A04 — Chef Login (expect 200)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Role is chef', () => pm.expect(pm.response.json().user.role).to.eql('chef'));",
+            "const b = pm.response.json(); pm.collectionVariables.set('chefToken', b.accessToken);"
+          ]}}],
+          "request": { "method": "POST", "url": "{{BASE_URL}}/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"email\":\"chef@rms.com\",\"password\":\"chef123\"}" }
+          }
+        },
+        {
+          "name": "A05 — Wrong Password (expect 401)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+            "pm.test('Message is Invalid credentials', () => pm.expect(pm.response.json().message).to.eql('Invalid credentials'));",
+            "pm.test('No token in response', () => pm.expect(pm.response.json()).to.not.have.property('accessToken'));"
+          ]}}],
+          "request": { "method": "POST", "url": "{{BASE_URL}}/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"email\":\"admin@rms.com\",\"password\":\"wrongpassword\"}" }
+          }
+        },
+        {
+          "name": "A06 — Non-existent Email (expect 401)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+            "pm.test('Same message as wrong password (no user enumeration)', () => pm.expect(pm.response.json().message).to.eql('Invalid credentials'));"
+          ]}}],
+          "request": { "method": "POST", "url": "{{BASE_URL}}/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"email\":\"nobody@rms.com\",\"password\":\"anything\"}" }
+          }
+        },
+        {
+          "name": "A07 — Missing Email Field (expect 422)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status is 422', () => pm.response.to.have.status(422));",
+            "pm.test('Has errors array', () => pm.expect(pm.response.json()).to.have.property('errors'));"
+          ]}}],
+          "request": { "method": "POST", "url": "{{BASE_URL}}/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"password\":\"admin123\"}" }
+          }
+        },
+        {
+          "name": "A08 — Missing Password Field (expect 422)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status is 422', () => pm.response.to.have.status(422));"
+          ]}}],
+          "request": { "method": "POST", "url": "{{BASE_URL}}/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"email\":\"admin@rms.com\"}" }
+          }
+        },
+        {
+          "name": "A09 — Invalid Email Format (expect 422)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status is 422', () => pm.response.to.have.status(422));"
+          ]}}],
+          "request": { "method": "POST", "url": "{{BASE_URL}}/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"email\":\"not-an-email\",\"password\":\"admin123\"}" }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "2. Token & Session Tests",
+      "item": [
+        {
+          "name": "B01 — Get Me (valid admin token)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns user object', () => { const b = pm.response.json(); pm.expect(b).to.have.property('id'); pm.expect(b).to.have.property('role'); });",
+            "pm.test('No password field', () => pm.expect(pm.response.json()).to.not.have.property('password'));"
+          ]}}],
+          "request": { "method": "GET", "url": "{{BASE_URL}}/auth/me",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }]
+          }
+        },
+        {
+          "name": "B02 — No Token (expect 401)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+            "pm.test('Message mentions no token', () => pm.expect(pm.response.json().message).to.include('token'));"
+          ]}}],
+          "request": { "method": "GET", "url": "{{BASE_URL}}/auth/me" }
+        },
+        {
+          "name": "B03 — Empty Bearer Token (expect 401)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+          ]}}],
+          "request": { "method": "GET", "url": "{{BASE_URL}}/auth/me",
+            "header": [{ "key": "Authorization", "value": "Bearer " }]
+          }
+        },
+        {
+          "name": "B04 — Malformed Token (expect 401)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+            "pm.test('Message mentions invalid token', () => pm.expect(pm.response.json().message).to.include('Invalid'));"
+          ]}}],
+          "request": { "method": "GET", "url": "{{BASE_URL}}/auth/me",
+            "header": [{ "key": "Authorization", "value": "Bearer this.is.not.a.valid.jwt" }]
+          }
+        },
+        {
+          "name": "B05 — Tampered Token Payload (expect 401)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status is 401 — tampered signature rejected', () => pm.response.to.have.status(401));"
+          ]}}],
+          "request": { "method": "GET", "url": "{{BASE_URL}}/auth/me",
+            "header": [{ "key": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImZha2VpZCIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTYwMDAwMDAwMH0.invalidsignature" }]
+          }
+        },
+        {
+          "name": "B06 — Expired Token (expect 401)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+            "pm.test('Message mentions expired', () => pm.expect(pm.response.json().message).to.include('expired'));"
+          ]}}],
+          "request": { "method": "GET", "url": "{{BASE_URL}}/auth/me",
+            "header": [{ "key": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5ZmM2NjM1MDAzZmI1Yjc1ZmEyZjU3ZSIsImlhdCI6MTYwMDAwMDAwMCwiZXhwIjoxNjAwMDAwOTAwfQ.expired_signature_here" }]
+          }
+        },
+        {
+          "name": "B07 — Refresh Token (expect 200)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns new accessToken', () => pm.expect(pm.response.json()).to.have.property('accessToken'));",
+            "pm.test('Returns user object', () => pm.expect(pm.response.json()).to.have.property('user'));"
+          ]}}],
+          "request": { "method": "POST", "url": "{{BASE_URL}}/auth/refresh" }
+        },
+        {
+          "name": "B08 — Logout (expect 200)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Success message', () => pm.expect(pm.response.json().message).to.include('Logged out'));"
+          ]}}],
+          "request": { "method": "POST", "url": "{{BASE_URL}}/auth/logout",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }]
+          }
+        },
+        {
+          "name": "B09 — Refresh After Logout (expect 401)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status is 401 — token revoked after logout', () => pm.response.to.have.status(401));",
+            "pm.test('Message mentions revoked', () => pm.expect(pm.response.json().message).to.include('revoked'));"
+          ]}}],
+          "request": { "method": "POST", "url": "{{BASE_URL}}/auth/refresh" }
+        }
+      ]
+    },
+
+    {
+      "name": "3. RBAC — Role Permission Tests",
+      "item": [
+        {
+          "name": "C01 — Waiter creates order (expect 201)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Waiter CAN create orders — status 201 or 422 (validation)', () => pm.expect([201,422]).to.include(pm.response.code));"
+          ]}}],
+          "request": { "method": "POST", "url": "{{BASE_URL}}/orders",
+            "header": [{ "key": "Authorization", "value": "Bearer {{waiterToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"table\":\"000000000000000000000001\",\"items\":[{\"menuItem\":\"000000000000000000000001\",\"quantity\":1}]}" }
+          }
+        },
+        {
+          "name": "C02 — Chef creates order (expect 403)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Chef CANNOT create orders — status 403', () => pm.response.to.have.status(403));",
+            "pm.test('Forbidden message', () => pm.expect(pm.response.json().message).to.include('Forbidden'));"
+          ]}}],
+          "request": { "method": "POST", "url": "{{BASE_URL}}/orders",
+            "header": [{ "key": "Authorization", "value": "Bearer {{chefToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"table\":\"000000000000000000000001\",\"items\":[{\"menuItem\":\"000000000000000000000001\",\"quantity\":1}]}" }
+          }
+        },
+        {
+          "name": "C03 — Waiter creates menu item (expect 403)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Waiter CANNOT create menu items — status 403', () => pm.response.to.have.status(403));"
+          ]}}],
+          "request": { "method": "POST", "url": "{{BASE_URL}}/menu",
+            "header": [{ "key": "Authorization", "value": "Bearer {{waiterToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"name\":\"Test\",\"price\":10,\"category\":\"main\"}" }
+          }
+        },
+        {
+          "name": "C04 — Manager creates menu item (expect 201)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Manager CAN create menu items — status 201', () => pm.response.to.have.status(201));",
+            "if (pm.response.code === 201) { pm.collectionVariables.set('testMenuItemId', pm.response.json()._id); }"
+          ]}}],
+          "request": { "method": "POST", "url": "{{BASE_URL}}/menu",
+            "header": [{ "key": "Authorization", "value": "Bearer {{managerToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"name\":\"RBAC Test Item\",\"price\":9.99,\"category\":\"main\",\"description\":\"Created during RBAC test\"}" }
+          }
+        },
+        {
+          "name": "C05 — Manager deletes menu item (expect 403)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Manager CANNOT delete menu items — status 403', () => pm.response.to.have.status(403));"
+          ]}}],
+          "request": { "method": "DELETE", "url": "{{BASE_URL}}/menu/{{testMenuItemId}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{managerToken}}" }]
+          }
+        },
+        {
+          "name": "C06 — Admin deletes menu item (expect 204)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Admin CAN delete menu items — status 204', () => pm.response.to.have.status(204));"
+          ]}}],
+          "request": { "method": "DELETE", "url": "{{BASE_URL}}/menu/{{testMenuItemId}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }]
+          }
+        },
+        {
+          "name": "C07 — Waiter reads staff list (expect 403)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Waiter CANNOT read staff list — status 403', () => pm.response.to.have.status(403));"
+          ]}}],
+          "request": { "method": "GET", "url": "{{BASE_URL}}/staff",
+            "header": [{ "key": "Authorization", "value": "Bearer {{waiterToken}}" }]
+          }
+        },
+        {
+          "name": "C08 — Manager reads staff list (expect 200)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Manager CAN read staff list — status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ]}}],
+          "request": { "method": "GET", "url": "{{BASE_URL}}/staff",
+            "header": [{ "key": "Authorization", "value": "Bearer {{managerToken}}" }]
+          }
+        },
+        {
+          "name": "C09 — Waiter reads analytics (expect 403)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Waiter CANNOT access analytics — status 403', () => pm.response.to.have.status(403));"
+          ]}}],
+          "request": { "method": "GET", "url": "{{BASE_URL}}/analytics/snapshot",
+            "header": [{ "key": "Authorization", "value": "Bearer {{waiterToken}}" }]
+          }
+        },
+        {
+          "name": "C10 — Chef reads analytics (expect 403)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Chef CANNOT access analytics — status 403', () => pm.response.to.have.status(403));"
+          ]}}],
+          "request": { "method": "GET", "url": "{{BASE_URL}}/analytics/snapshot",
+            "header": [{ "key": "Authorization", "value": "Bearer {{chefToken}}" }]
+          }
+        },
+        {
+          "name": "C11 — Manager reads analytics (expect 200)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Manager CAN access analytics — status 200', () => pm.response.to.have.status(200));"
+          ]}}],
+          "request": { "method": "GET", "url": "{{BASE_URL}}/analytics/snapshot",
+            "header": [{ "key": "Authorization", "value": "Bearer {{managerToken}}" }]
+          }
+        },
+        {
+          "name": "C12 — Waiter marks payroll paid (expect 403)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Waiter CANNOT mark payroll paid — status 403', () => pm.response.to.have.status(403));"
+          ]}}],
+          "request": { "method": "PATCH", "url": "{{BASE_URL}}/staff/payroll/000000000000000000000001/paid",
+            "header": [{ "key": "Authorization", "value": "Bearer {{waiterToken}}" }]
+          }
+        },
+        {
+          "name": "C13 — Manager marks payroll paid (expect 403)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Manager CANNOT mark payroll paid (admin only) — status 403', () => pm.response.to.have.status(403));"
+          ]}}],
+          "request": { "method": "PATCH", "url": "{{BASE_URL}}/staff/payroll/000000000000000000000001/paid",
+            "header": [{ "key": "Authorization", "value": "Bearer {{managerToken}}" }]
+          }
+        },
+        {
+          "name": "C14 — Chef reads inventory (expect 200)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Chef CAN read inventory — status 200', () => pm.response.to.have.status(200));"
+          ]}}],
+          "request": { "method": "GET", "url": "{{BASE_URL}}/inventory/ingredients",
+            "header": [{ "key": "Authorization", "value": "Bearer {{chefToken}}" }]
+          }
+        },
+        {
+          "name": "C15 — Waiter reads inventory (expect 403)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Waiter CANNOT read inventory — status 403', () => pm.response.to.have.status(403));"
+          ]}}],
+          "request": { "method": "GET", "url": "{{BASE_URL}}/inventory/ingredients",
+            "header": [{ "key": "Authorization", "value": "Bearer {{waiterToken}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Register Tests",
+      "item": [
+        {
+          "name": "D01 — Register new user (defaults to waiter)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+            "pm.test('Role defaults to waiter', () => pm.expect(pm.response.json().user.role).to.eql('waiter'));",
+            "pm.test('Has accessToken', () => pm.expect(pm.response.json()).to.have.property('accessToken'));",
+            "if (pm.response.code === 201) pm.collectionVariables.set('newUserId', pm.response.json().user.id);"
+          ]}}],
+          "request": { "method": "POST", "url": "{{BASE_URL}}/auth/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"name\":\"Test User\",\"email\":\"testuser_rbac@rms.com\",\"password\":\"test1234\"}" }
+          }
+        },
+        {
+          "name": "D02 — Register with role field (non-admin, still waiter)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Role is waiter regardless of requested role', () => { const b = pm.response.json(); if (b.user) pm.expect(b.user.role).to.eql('waiter'); });"
+          ]}}],
+          "request": { "method": "POST", "url": "{{BASE_URL}}/auth/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"name\":\"Hacker\",\"email\":\"hacker@rms.com\",\"password\":\"hack1234\",\"role\":\"admin\"}" }
+          }
+        },
+        {
+          "name": "D03 — Duplicate email (expect 409)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status is 409 for duplicate email', () => pm.response.to.have.status(409));",
+            "pm.test('Message mentions email in use', () => pm.expect(pm.response.json().message).to.include('use'));"
+          ]}}],
+          "request": { "method": "POST", "url": "{{BASE_URL}}/auth/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"name\":\"Duplicate\",\"email\":\"admin@rms.com\",\"password\":\"admin123\"}" }
+          }
+        },
+        {
+          "name": "D04 — Short password (expect 422)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status is 422 for short password', () => pm.response.to.have.status(422));"
+          ]}}],
+          "request": { "method": "POST", "url": "{{BASE_URL}}/auth/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"name\":\"Test\",\"email\":\"short@rms.com\",\"password\":\"abc\"}" }
+          }
+        },
+        {
+          "name": "D05 — Admin assigns manager role to new user",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Admin can update role — status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Role is now manager', () => pm.expect(pm.response.json().role).to.eql('manager'));"
+          ]}}],
+          "request": { "method": "PUT", "url": "{{BASE_URL}}/staff/{{newUserId}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"role\":\"manager\"}" }
+          }
+        }
+      ]
+    }
+  ]
+}

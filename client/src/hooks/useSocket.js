@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import useAuthStore from '../store/authStore.js';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
 /**
  * Hook to manage Socket.IO connection with auto-reconnect and auth.
