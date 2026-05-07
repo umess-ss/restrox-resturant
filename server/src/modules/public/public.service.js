@@ -31,10 +31,18 @@ const assertObjectId = (value, label) => {
 };
 
 const publicBillPayload = (order, payment) => ({
+  restaurantName: order.restaurant?.name,
+  restaurantAddress: order.restaurant?.address,
+  restaurantPhone: order.restaurant?.phone,
+  branchName: order.branch?.name,
+  branchAddress: order.branch?.address,
+  branchPhone: order.branch?.phone,
   orderNumber: order.orderNumber,
   tableNumber: order.table?.number,
   customerName: order.customerName,
   customerPhone: order.customerPhone,
+  createdAt: order.createdAt,
+  paidAt: order.paidAt,
   items: order.items.map((i) => ({
     name: i.name,
     quantity: i.quantity,
@@ -379,7 +387,9 @@ export const getPublicBill = async (orderId) => {
   assertObjectId(orderId, 'orderId');
 
   const order = await Order.findById(orderId)
-    .select('orderNumber table customerName customerPhone items subtotal taxAmount discountAmount totalAmount status paymentStatus billStatus paymentMethod transactionId')
+    .select('orderNumber restaurant branch table customerName customerPhone items subtotal taxAmount discountAmount totalAmount status paymentStatus billStatus paymentMethod transactionId createdAt paidAt')
+    .populate('restaurant', 'name address phone')
+    .populate('branch', 'name address phone')
     .populate('table', 'number')
     .lean();
 
@@ -424,30 +434,97 @@ export const getReceiptPdf = async (orderId) => {
     throw Object.assign(new Error('Receipt is available after payment'), { status: 403 });
   }
 
-  const lines = [
-    'Restaurant Receipt',
-    `Order: ${bill.orderNumber}`,
-    `Table: ${bill.tableNumber || '-'}`,
-    bill.customerName ? `Customer: ${bill.customerName}` : null,
-    '',
-    ...bill.items.map((i) => `${i.name} x${i.quantity}  ${formatCurrency(i.lineTotal)}`),
-    '',
-    `Subtotal: ${formatCurrency(bill.subtotal)}`,
-    `Discount: ${formatCurrency(bill.discount)}`,
-    `Tax: ${formatCurrency(bill.tax)}`,
-    `Service charge: ${formatCurrency(bill.serviceCharge)}`,
-    `Total: ${formatCurrency(bill.totalAmount)}`,
-    bill.paymentMethod ? `Payment method: ${bill.paymentMethod}` : null,
-    bill.transactionId ? `Transaction ID: ${bill.transactionId}` : null,
-    'Payment completed',
-  ].filter((line) => line !== null);
+  const width = 226;
+  const margin = 12;
+  const fontSize = 8.5;
+  const lineHeight = 10;
+  const chars = 38;
+  const separator = '-'.repeat(chars);
+  const paidAt = bill.paidAt || new Date();
 
-  const content = lines.map((line, i) => `BT /F1 12 Tf 50 ${760 - i * 18} Td (${String(line).replace(/[()\\]/g, '\\$&')}) Tj ET`).join('\n');
+  const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
+  const title = (value) => ({ text: clean(value), align: 'center', size: 10 });
+  const center = (value) => ({ text: clean(value), align: 'center' });
+  const line = (value = '') => ({ text: clean(value) });
+  const pair = (label, value, strong = false) => ({ label: clean(label), value: clean(value), strong });
+  const wrap = (text, max = chars) => {
+    const words = clean(text).split(' ');
+    const out = [];
+    let current = '';
+    words.forEach((word) => {
+      if ((current ? current.length + 1 : 0) + word.length <= max) {
+        current = current ? `${current} ${word}` : word;
+      } else {
+        if (current) out.push(current);
+        current = word.slice(0, max);
+      }
+    });
+    if (current) out.push(current);
+    return out.length ? out : [''];
+  };
+  const row = (left, right) => {
+    const leftText = clean(left);
+    const rightText = clean(right);
+    const spaces = Math.max(1, chars - leftText.length - rightText.length);
+    return `${leftText}${' '.repeat(spaces)}${rightText}`;
+  };
+
+  const rows = [
+    title(bill.restaurantName || 'Restaurant'),
+    bill.branchName ? center(bill.branchName) : null,
+    bill.branchAddress || bill.restaurantAddress ? center(bill.branchAddress || bill.restaurantAddress) : null,
+    bill.branchPhone || bill.restaurantPhone ? center(`Phone: ${bill.branchPhone || bill.restaurantPhone}`) : null,
+    center('PAN/VAT: -'),
+    line(separator),
+    pair('Receipt No', `RCPT-${bill.orderNumber}`),
+    pair('Order No', bill.orderNumber),
+    pair('Table', bill.tableNumber || '-'),
+    bill.customerName ? pair('Customer', bill.customerName) : null,
+    bill.customerPhone ? pair('Phone', bill.customerPhone) : null,
+    pair('Date', new Date(paidAt).toLocaleDateString()),
+    pair('Time', new Date(paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })),
+    line(separator),
+    line(row('Item', 'Amount')),
+    line(separator),
+    ...bill.items.flatMap((item) => [
+      ...wrap(item.name, chars).map(line),
+      line(row(`  ${item.quantity} x ${formatCurrency(item.price)}`, formatCurrency(item.lineTotal))),
+    ]),
+    line(separator),
+    pair('Subtotal', formatCurrency(bill.subtotal)),
+    bill.discount ? pair('Discount', formatCurrency(bill.discount)) : null,
+    pair('VAT/Tax', formatCurrency(bill.tax)),
+    bill.serviceCharge ? pair('Service Charge', formatCurrency(bill.serviceCharge)) : null,
+    line(separator),
+    pair('Grand Total', formatCurrency(bill.totalAmount), true),
+    line(separator),
+    pair('Payment', bill.paymentMethod || '-'),
+    bill.transactionId ? pair('Txn ID', bill.transactionId) : null,
+    pair('Status', bill.paymentStatus),
+    line(separator),
+    center('Thank you for dining with us'),
+    center('Please visit again'),
+    center(`Order ID: ${String(orderId).slice(-8)}`),
+  ].filter(Boolean);
+
+  const height = Math.max(360, rows.length * lineHeight + 28);
+  const escapePdf = (value) => String(value).replace(/[()\\]/g, '\\$&');
+  const textWidth = (text, size = fontSize) => clean(text).length * size * 0.6;
+  const content = rows.map((entry, i) => {
+    const size = entry.size || (entry.strong ? 10 : fontSize);
+    const text = entry.label ? row(`${entry.label}:`, entry.value) : entry.text;
+    const x = entry.align === 'center'
+      ? Math.max(margin, (width - textWidth(text, size)) / 2)
+      : margin;
+    const y = height - margin - (i + 1) * lineHeight;
+    return `BT /F1 ${size} Tf ${x.toFixed(2)} ${y.toFixed(2)} Td (${escapePdf(text)}) Tj ET`;
+  }).join('\n');
+
   const objects = [
     '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj',
     '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj',
-    '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj',
-    '4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj',
+    `3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj`,
+    '4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Courier >> endobj',
     `5 0 obj << /Length ${content.length} >> stream\n${content}\nendstream endobj`,
   ];
   let pdf = '%PDF-1.4\n';
