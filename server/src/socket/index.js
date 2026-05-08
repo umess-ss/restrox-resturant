@@ -15,10 +15,17 @@ const ROLE_ROOMS = {
 
 const socketAllowedOrigins = [
   'http://localhost:5173',
-  'http://127.0.0.1:5173',
-  'http://192.168.18.6:5173',
+  'http://localhost:5174',
   process.env.CLIENT_URL,
 ].filter(Boolean);
+
+const socketCorsOrigin = (origin, callback) => {
+  if (!origin) return callback(null, true);
+  if (socketAllowedOrigins.includes(origin)) {
+    return callback(null, true);
+  }
+  return callback(null, false);
+};
 
 // ─── Auth middleware ──────────────────────────────────────────────────────────
 
@@ -44,7 +51,7 @@ const authenticateSocket = async (socket, next) => {
 export const initSocket = (httpServer) => {
   const io = new Server(httpServer, {
     cors: {
-      origin: socketAllowedOrigins,
+      origin: socketCorsOrigin,
       credentials: true,
     },
     transports: ['websocket', 'polling'],

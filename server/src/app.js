@@ -21,21 +21,12 @@ const app = express();
 
 // ─── CORS — must be first, before Helmet and rate limiters ───────────────────
 //
-// Allowed origins are built from env vars — nothing is hardcoded.
-//   CLIENT_URL      → primary origin (used for QR generation too)
-//   CORS_ORIGINS    → comma-separated extra origins (e.g. LAN IP for mobile testing)
-//
-// Hardcoded localhost/127.0.0.1 entries ensure the laptop browser always works
-// even if CLIENT_URL is set to the LAN IP for mobile testing.
+// Allowed origins are built from local dev defaults plus CLIENT_URL.
 const allowedOrigins = new Set(
   [
     'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://192.168.18.6:5173',
+    'http://localhost:5174',
     process.env.CLIENT_URL,
-    ...(process.env.CORS_ORIGINS
-      ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
-      : []),
   ].filter(Boolean)
 );
 
@@ -100,6 +91,11 @@ app.use('/api/public', publicRoutes);
 app.use('/api/payments', paymentRoutes);
 
 // Health check
+app.get('/api/health', (_, res) => res.json({
+  status: 'ok',
+  service: 'restrox-backend',
+  timestamp: new Date().toISOString(),
+}));
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
 
 // ─── Error handling ───────────────────────────────────────────────────────────

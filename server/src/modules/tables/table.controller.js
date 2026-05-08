@@ -65,7 +65,11 @@ export const getTableQR = async (req, res) => {
     return res.status(422).json({ message: 'Table is missing restaurant or branch data' });
   }
 
-  const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+  const clientUrl = process.env.CLIENT_URL || req.get('origin');
+  if (!clientUrl) {
+    return res.status(500).json({ message: 'CLIENT_URL is required to generate table QR codes' });
+  }
+
   const qrUrl = `${clientUrl}/customer/${table.restaurant}/${table.branch}/table/${table._id}`;
 
   // Generate QR as base64 data URL (PNG)
