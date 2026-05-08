@@ -4,6 +4,8 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import authRoutes from './modules/auth/auth.routes.js';
 import menuRoutes from './modules/menu/menu.routes.js';
@@ -16,6 +18,10 @@ import saasRoutes from './modules/saas/restaurant.routes.js';
 import publicRoutes from './modules/public/public.routes.js';
 import paymentRoutes from './modules/payments/payment.routes.js';
 import { errorHandler, notFound } from './middlewares/error.middleware.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const publicDir = path.join(__dirname, '..', 'public');
 
 const app = express();
 
@@ -52,7 +58,7 @@ app.options('*', cors(corsOptions));
 app.use(cors(corsOptions));
 
 // ─── Security & parsing ───────────────────────────────────────────────────────
-app.use(helmet());
+app.use(helmet({contentSecurityPolicy: false,}));
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -97,6 +103,14 @@ app.get('/api/health', (_, res) => res.json({
   timestamp: new Date().toISOString(),
 }));
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
+
+// ─── Static frontend ─────────────────────────────────────────────────────────
+app.use(express.static(publicDir));
+
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) return next();
+  return res.sendFile(path.join(publicDir, 'index.html'));
+});
 
 // ─── Error handling ───────────────────────────────────────────────────────────
 app.use(notFound);
