@@ -13,8 +13,9 @@
 import { useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { EVENTS } from '../socket/events.js';
+import { getSocketUrl } from '../api/config.js';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+const SOCKET_URL = getSocketUrl();
 
 /**
  * @param {string}   orderId   - order to watch

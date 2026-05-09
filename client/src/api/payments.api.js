@@ -1,9 +1,17 @@
 import api from './axios.js';
 import axios from 'axios';
+import { getApiBaseUrl, getApiPath } from './config.js';
 
 const base = '/payments';
 const publicApi = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: getApiBaseUrl(),
+});
+
+publicApi.interceptors.request.use((config) => {
+  if (config.url && !/^https?:\/\//i.test(config.url)) {
+    config.url = getApiPath(config.url);
+  }
+  return config;
 });
 
 export const initiatePayment = (data) => api.post(`${base}/initiate`, data).then((r) => r.data);

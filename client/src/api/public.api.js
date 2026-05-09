@@ -5,10 +5,18 @@
  * Uses plain axios — no auth token, no interceptors that redirect to login.
  */
 import axios from 'axios';
+import { buildApiUrl, getApiBaseUrl, getApiPath } from './config.js';
 
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const BASE = getApiBaseUrl();
 
 const pub = axios.create({ baseURL: BASE });
+
+pub.interceptors.request.use((config) => {
+  if (config.url && !/^https?:\/\//i.test(config.url)) {
+    config.url = getApiPath(config.url);
+  }
+  return config;
+});
 
 // ─── Table info ───────────────────────────────────────────────────────────────
 export const fetchPublicTable = (restaurantId, branchId, tableId) =>
@@ -35,7 +43,7 @@ export const requestPublicBill = (orderId) =>
   pub.post(`/public/orders/${orderId}/request-bill`).then((r) => r.data);
 
 export const publicReceiptPdfUrl = (orderId) =>
-  `${BASE}/public/orders/${orderId}/receipt/pdf`;
+  buildApiUrl(`/public/orders/${orderId}/receipt/pdf`);
 
 // ─── Call waiter ──────────────────────────────────────────────────────────────
 export const callPublicWaiter = (orderId) =>

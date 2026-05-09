@@ -3,8 +3,9 @@ import { io } from 'socket.io-client';
 import { toast } from 'react-toastify';
 import useAuthStore from '../store/authStore.js';
 import { EVENTS } from './events.js';
+import { getSocketUrl } from '../api/config.js';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+const SOCKET_URL = getSocketUrl();
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 

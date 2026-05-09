@@ -1,4 +1,4 @@
-# Restaurant Management System (MERN)
+# Restrox Restaurant Management System (MERN)
 
 Full-stack restaurant management application built with MongoDB, Express, React, and Node.js.
 
@@ -47,6 +47,7 @@ restaurant-management-system/
 │   │   ├── app.js            # Express app setup
 │   │   └── index.js          # Server entry point
 │   ├── .env.example
+│   ├── public/                   # Built React/Vite frontend served by Express
 │   └── package.json
 │
 ├── client/                    # Frontend application
@@ -111,8 +112,10 @@ CLIENT_URL=http://localhost:5173
 
 **Client** (`client/.env`):
 ```env
-VITE_API_URL=http://localhost:5000/api
+VITE_API_URL=/api
 ```
+
+The Vite dev server proxies `/api` and `/socket.io` to the local backend, so the frontend can use the same relative API base in development and production.
 
 ### 3. Start MongoDB
 
@@ -180,12 +183,56 @@ Frontend runs on `http://localhost:5173`
 9. **Protected Routes**: Role-based access control
 10. **Responsive UI**: Tailwind CSS with mobile-first approach
 
-## Production Build
+## Deployment
+
+The current production deployment serves the React/Vite frontend from the Express backend on AWS Elastic Beanstalk. This keeps the frontend and API on the same origin and avoids browser mixed-content blocking.
+
+Current stack:
+- AWS Elastic Beanstalk for the Node.js/Express app
+- React/Vite built into `server/public`
+- MongoDB Atlas for the cloud database
+- Elastic Beanstalk environment variables for production configuration
+
+This deployment replaced the previous Amplify plus Beanstalk split deployment because Amplify served the frontend over HTTPS while the Beanstalk backend was HTTP, causing browser mixed-content blocking. CloudFront was unavailable while the AWS account required verification, and Amplify rewrites require an HTTPS target.
+
+Required production environment variables:
+
+```env
+NODE_ENV=production
+PORT=8080
+MONGO_URI=your_mongodb_atlas_uri
+CLIENT_URL=http://your-beanstalk-environment-url
+JWT_SECRET=your_jwt_secret
+JWT_REFRESH_SECRET=your_refresh_secret
+```
+
+Build and copy the frontend before creating the Elastic Beanstalk zip:
 
 ```bash
-npm run build:client
-npm start
+cd client
+npm install
+npm run build
+cd ..
+mkdir -p server/public
+cp -R client/dist/. server/public/
 ```
+
+Create the deployment zip from inside `server`:
+
+```bash
+cd server
+zip -r ../restrox-fullstack-v1.zip . -x "node_modules/*" ".env" ".env.*" "logs/*"
+```
+
+The zip must contain `package.json` at the root and include `public/index.html` plus `public/assets`. Do not include `.env` files or `node_modules`.
+
+More details are in [AWS_DEPLOYMENT.md](./AWS_DEPLOYMENT.md).
+
+Future deployment improvements include adding HTTPS with a custom domain, ALB, and ACM; moving the frontend back to Amplify or S3/CloudFront; adding GitHub Actions CI/CD; splitting backend services if needed; and converting infrastructure to Terraform.
+
+## Production Build
+
+For the single-origin Beanstalk deployment, build the client and copy `client/dist` into `server/public` before starting the server. Express serves the frontend after all `/api` routes.
 
 ## Default User Roles
 

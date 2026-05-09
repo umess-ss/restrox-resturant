@@ -1,13 +1,18 @@
 import axios from 'axios';
 import useAuthStore from '../store/authStore.js';
+import { getApiBaseUrl, getApiPath } from './config.js';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: getApiBaseUrl(),
   withCredentials: true, // send httpOnly refresh token cookie
 });
 
 // Attach access token to every request
 api.interceptors.request.use((config) => {
+  if (config.url && !/^https?:\/\//i.test(config.url)) {
+    config.url = getApiPath(config.url);
+  }
+
   const token = useAuthStore.getState().accessToken;
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
