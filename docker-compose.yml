@@ -3,12 +3,13 @@ services:
     build:
       context: ./server
       dockerfile: Dockerfile
+      target: runner
     container_name: restrox-backend
     ports:
       - "5000:5000"
     env_file:
-    - ./server/.env
+      - ./server/.env
     environment:
-      NODE_ENV: development
+      NODE_ENV: production
       PORT: 5000
     restart: unless-stopped
