@@ -2,6 +2,14 @@
 
 Full-stack restaurant management application built with MongoDB, Express, React, and Node.js.
 
+## Live Demo
+
+- **App**: http://restrox-app-env.eba-zrpzy9p6.us-east-1.elasticbeanstalk.com
+- **API**: https://api.umeshrajbanshi.com.np/
+- **Test credentials**:
+  - Username: `admin`
+  - Password: `password`
+
 ## Features
 
 - **Authentication**: JWT-based auth with role-based access control (admin, manager, waiter, chef)
