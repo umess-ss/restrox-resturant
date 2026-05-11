@@ -1,79 +1,80 @@
 {
-    "containerDefinitions": [
+  "containerDefinitions": [
+    {
+      "name": "restrox-backend",
+      "image": "348362971250.dkr.ecr.us-east-1.amazonaws.com/restrox-backend",
+      "cpu": 0,
+      "portMappings": [
         {
-            "name": "restrox-backend",
-            "image": "348362971250.dkr.ecr.us-east-1.amazonaws.com/restrox-backend",
-            "cpu": 0,
-            "portMappings": [
-                {
-                    "containerPort": 5000,
-                    "hostPort": 5000,
-                    "protocol": "tcp",
-                    "name": "restrox-backend-5000-tcp",
-                    "appProtocol": "http"
-                }
-            ],
-            "essential": true,
-            "environment": [
-                {
-                    "name": "JWT_REFRESH_SECRET",
-                    "value": "arn:aws:ssm:us-east-1:348362971250:parameter/restrox/prod/JWT_REFRESH_SECRET"
-                },
-                {
-                    "name": "JWT_SECRET",
-                    "value": "arn:aws:ssm:us-east-1:348362971250:parameter/restrox/prod/JWT_SECRET"
-                },
-                {
-                    "name": "MONGO_URI",
-                    "value": "arn:aws:ssm:us-east-1:348362971250:parameter/restrox/prod/MONGO_URI"
-                },
-                {
-                    "name": "JWT_REFRESH_EXPIRES_IN",
-                    "value": "7d"
-                },
-                {
-                    "name": "CLIENT_URL",
-                    "value": "http://localhost:5173"
-                },
-                {
-                    "name": "NODE_ENV",
-                    "value": "production"
-                },
-                {
-                    "name": "JWT_EXPIRES_IN",
-                    "value": "15m"
-                }
-            ],
-            "environmentFiles": [],
-            "mountPoints": [],
-            "volumesFrom": [],
-            "ulimits": [],
-            "logConfiguration": {
-                "logDriver": "awslogs",
-                "options": {
-                    "awslogs-group": "/ecs/restrox-backend-task",
-                    "awslogs-create-group": "true",
-                    "awslogs-region": "us-east-1",
-                    "awslogs-stream-prefix": "ecs"
-                },
-                "secretOptions": []
-            },
-            "systemControls": []
+          "containerPort": 5000,
+          "hostPort": 5000,
+          "protocol": "tcp",
+          "name": "restrox-backend-5000-tcp",
+          "appProtocol": "http"
         }
-    ],
-    "family": "restrox-backend-task",
-    "executionRoleArn": "arn:aws:iam::348362971250:role/ecsTaskExecutionRole",
-    "networkMode": "awsvpc",
-    "volumes": [],
-    "status": "ACTIVE",
-    "placementConstraints": [],
-    "runtimePlatform": {
-        "cpuArchitecture": "X86_64",
-        "operatingSystemFamily": "LINUX"
-    },
-    "requiresCompatibilities": [
-        "FARGATE"
-    ],
-    "cpu": "256",
-    "memory": "512"
+      ],
+      "essential": true,
+      "environment": [
+        {
+          "name": "JWT_REFRESH_EXPIRES_IN",
+          "value": "7d"
+        },
+        {
+          "name": "CLIENT_URL",
+          "value": "https://your-frontend-domain.com"
+        },
+        {
+          "name": "NODE_ENV",
+          "value": "production"
+        },
+        {
+          "name": "JWT_EXPIRES_IN",
+          "value": "15m"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "MONGO_URI",
+          "valueFrom": "arn:aws:ssm:us-east-1:348362971250:parameter/restrox/prod/MONGO_URI"
+        },
+        {
+          "name": "JWT_SECRET",
+          "valueFrom": "arn:aws:ssm:us-east-1:348362971250:parameter/restrox/prod/JWT_SECRET"
+        },
+        {
+          "name": "JWT_REFRESH_SECRET",
+          "valueFrom": "arn:aws:ssm:us-east-1:348362971250:parameter/restrox/prod/JWT_REFRESH_SECRET"
+        }
+      ],
+      "environmentFiles": [],
+      "mountPoints": [],
+      "volumesFrom": [],
+      "ulimits": [],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/restrox-backend-task",
+          "awslogs-create-group": "true",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        },
+        "secretOptions": []
+      },
+      "systemControls": []
+    }
+  ],
+  "family": "restrox-backend-task",
+  "executionRoleArn": "arn:aws:iam::348362971250:role/ecsTaskExecutionRole",
+  "networkMode": "awsvpc",
+  "volumes": [],
+  "placementConstraints": [],
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "256",
+  "memory": "512"
 }
