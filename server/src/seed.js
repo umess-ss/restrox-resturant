@@ -63,7 +63,7 @@ const USERS = [
   { name: 'Alex Waiter',   email: 'waiter@rms.com',   password: 'waiter123',   role: 'waiter'  },
   { name: 'Lisa Waiter',   email: 'waiter2@rms.com',  password: 'waiter123',   role: 'waiter'  },
 ];
-
+h
 const userMap = {};
 for (const u of USERS) {
   let user = await User.findOne({ email: u.email });
