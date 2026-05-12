@@ -1,6 +1,8 @@
 .env
 .env.*
 !.env.example
+.venv/
+venv/
 
 client/.env
 client/.env.*
@@ -11,3 +13,18 @@ server/.env
 server/.env.*
 !server/.env.example
 !server/.env.production.example
+
+
+# Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+**/terraform.tfstate
+**/terraform.tfstate.backup
+**/*.tfstate
+**/*.tfstate.*
+**/crash.log
+**/crash.*.log
+**/*.tfvars
+
+# Terraform local backups
+**/backups/
