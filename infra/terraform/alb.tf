@@ -8,11 +8,6 @@ resource "aws_lb" "main" {
     "subnet-03978282da6bd61fe",
     "subnet-0b94aa31e9eeec639"
   ]
-
-  lifecycle {
-    prevent_destroy = true
-  }
-
   tags = {
     Project     = "restrox"
     Environment = "dev"
@@ -37,11 +32,6 @@ resource "aws_lb_target_group" "backend" {
     healthy_threshold   = 5
     unhealthy_threshold = 2
   }
-
-  lifecycle {
-    prevent_destroy = true
-  }
-
   tags = {
     Project     = "restrox"
     Environment = "dev"

@@ -15,11 +15,6 @@ resource "aws_lb_listener" "http_80" {
       status_code = "HTTP_301"
     }
   }
-
-  lifecycle {
-    prevent_destroy = true
-  }
-
   tags = {
     Project     = "restrox"
     Environment = "dev"
@@ -38,11 +33,6 @@ resource "aws_lb_listener" "https_443" {
     type             = "forward"
     target_group_arn = aws_lb_target_group.backend.arn
   }
-
-  lifecycle {
-    prevent_destroy = true
-  }
-
   tags = {
     Project     = "restrox"
     Environment = "dev"

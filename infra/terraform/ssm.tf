@@ -4,7 +4,6 @@ resource "aws_ssm_parameter" "mongo_uri" {
   value = "PLACEHOLDER_DO_NOT_USE"
 
   lifecycle {
-    prevent_destroy = true
     ignore_changes = [
       value
     ]
@@ -23,7 +22,6 @@ resource "aws_ssm_parameter" "jwt_secret" {
   value = "PLACEHOLDER_DO_NOT_USE"
 
   lifecycle {
-    prevent_destroy = true
     ignore_changes = [
       value
     ]
@@ -42,7 +40,6 @@ resource "aws_ssm_parameter" "jwt_refresh_secret" {
   value = "PLACEHOLDER_DO_NOT_USE"
 
   lifecycle {
-    prevent_destroy = true
     ignore_changes = [
       value
     ]

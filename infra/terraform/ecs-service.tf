@@ -38,8 +38,6 @@ resource "aws_ecs_service" "backend" {
   deployment_maximum_percent         = 200
 
   lifecycle {
-    prevent_destroy = true
-
     ignore_changes = [
       task_definition
     ]

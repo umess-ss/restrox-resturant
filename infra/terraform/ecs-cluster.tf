@@ -6,11 +6,6 @@ resource "aws_ecs_cluster" "main" {
       logging = "DEFAULT"
     }
   }
-
-  lifecycle {
-    prevent_destroy = true
-  }
-
   tags = {
     Project     = "restrox"
     Environment = "dev"

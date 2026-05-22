@@ -1,5 +1,6 @@
 resource "aws_ecr_repository" "backend" {
-  name = "restrox-backend"
+  name         = "restrox-backend"
+  force_delete = true
 
   image_tag_mutability = "MUTABLE"
 
@@ -10,10 +11,6 @@ resource "aws_ecr_repository" "backend" {
 
   image_scanning_configuration {
     scan_on_push = false
-  }
-
-  lifecycle {
-    prevent_destroy = true
   }
 
   tags = {

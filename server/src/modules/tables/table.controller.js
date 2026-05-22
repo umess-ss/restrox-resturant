@@ -65,10 +65,8 @@ export const getTableQR = async (req, res) => {
     return res.status(422).json({ message: 'Table is missing restaurant or branch data' });
   }
 
-  const clientUrl = process.env.CLIENT_URL || req.get('origin');
-  if (!clientUrl) {
-    return res.status(500).json({ message: 'CLIENT_URL is required to generate table QR codes' });
-  }
+  const requestBaseUrl = `${req.protocol}://${req.get('host')}`;
+  const clientUrl = (process.env.CLIENT_URL || req.get('origin') || requestBaseUrl).replace(/\/+$/, '');
 
   const qrUrl = `${clientUrl}/customer/${table.restaurant}/${table.branch}/table/${table._id}`;
 
