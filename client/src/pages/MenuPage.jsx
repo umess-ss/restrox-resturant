@@ -15,6 +15,13 @@ import formatCurrency from '../utils/formatCurrency.js';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CATEGORIES = ['appetizer', 'main', 'dessert', 'beverage', 'special'];
+const CATEGORY_ICONS = {
+  appetizer: '🥟',
+  main: '🍔',
+  dessert: '🧁',
+  beverage: '🥤',
+  special: '⭐',
+};
 const CATEGORY_COLORS = {
   appetizer: 'bg-yellow-100 text-yellow-700',
   main: 'bg-orange-100 text-orange-700',
@@ -412,6 +419,7 @@ export default function MenuPage() {
   const [items, setItems] = useState([]);
   const [ingredients, setIngredients] = useState([]);
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [search, setSearch] = useState('');
   const [itemModal, setItemModal] = useState(null);   // null | 'new' | item object
   const [recipeModal, setRecipeModal] = useState(null); // null | item object
   const [showMargins, setShowMargins] = useState(false);
@@ -442,116 +450,229 @@ export default function MenuPage() {
     }
   };
 
-  const displayed = categoryFilter ? items.filter((i) => i.category === categoryFilter) : items;
+  const categoryCounts = CATEGORIES.reduce((acc, category) => {
+    acc[category] = items.filter((item) => item.category === category).length;
+    return acc;
+  }, {});
+
+  const displayed = items.filter((item) => {
+    const matchesCategory = !categoryFilter || item.category === categoryFilter;
+    const query = search.trim().toLowerCase();
+    const matchesSearch = !query
+      || item.name?.toLowerCase().includes(query)
+      || item.description?.toLowerCase().includes(query)
+      || item.tags?.some((tag) => tag.toLowerCase().includes(query));
+    return matchesCategory && matchesSearch;
+  });
+  const popularItems = displayed.slice(0, 4);
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-gray-800">Menu</h2>
-        <div className="flex gap-2">
+    <div className="-m-4 min-h-[calc(100vh-3.5rem)] bg-[#f7f7f7] p-4 lg:-m-6 lg:p-6">
+      <div className="mb-7 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wide text-orange-500">Restaurant menu</p>
+          <h1 className="mt-1 text-3xl font-extrabold text-gray-900">Menu</h1>
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row">
           <button
             onClick={() => setShowMargins(true)}
-            className="text-sm border border-orange-300 text-orange-600 px-3 py-1.5 rounded-lg hover:bg-orange-50"
-          >📊 Margins</button>
+            className="rounded-2xl border border-orange-200 bg-white px-5 py-3 text-sm font-bold text-orange-600 shadow-sm transition hover:bg-orange-50"
+          >Margins</button>
           <button
             onClick={() => setItemModal('new')}
-            className="text-sm bg-orange-500 text-white px-3 py-1.5 rounded-lg hover:bg-orange-600"
-          >+ New Item</button>
+            className="rounded-2xl bg-orange-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-200 transition hover:bg-orange-600"
+          >Add New Menu</button>
         </div>
       </div>
 
-      {/* Category filter */}
-      <div className="flex gap-2 flex-wrap">
-        <button
-          onClick={() => setCategoryFilter('')}
-          className={`text-xs px-3 py-1 rounded-full border transition-colors ${!categoryFilter ? 'bg-gray-800 text-white border-gray-800' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
-        >All</button>
-        {CATEGORIES.map((c) => (
+      <div className="mb-7 max-w-3xl">
+        <label className="relative block">
+          <span className="absolute left-5 top-1/2 -translate-y-1/2 text-2xl text-orange-400">⌕</span>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search"
+            className="h-14 w-full rounded-2xl border border-transparent bg-white pl-14 pr-5 text-sm text-gray-800 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-orange-200 focus:ring-4 focus:ring-orange-100"
+          />
+        </label>
+      </div>
+
+      <section className="mb-7">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-extrabold text-gray-900">Category</h2>
+          {(categoryFilter || search) && (
+            <button
+              onClick={() => { setCategoryFilter(''); setSearch(''); }}
+              className="text-sm font-bold text-orange-500 hover:text-orange-600"
+            >View all ›</button>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           <button
-            key={c}
-            onClick={() => setCategoryFilter(c)}
-            className={`text-xs px-3 py-1 rounded-full border capitalize transition-colors ${categoryFilter === c ? 'bg-gray-800 text-white border-gray-800' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
-          >{c}</button>
-        ))}
-      </div>
+            onClick={() => setCategoryFilter('')}
+            className={`rounded-2xl border bg-white p-5 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-orange-300 hover:shadow-lg hover:shadow-orange-100 ${
+              !categoryFilter ? 'border-orange-300 ring-4 ring-orange-100' : 'border-transparent'
+            }`}
+          >
+            <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-orange-50 text-3xl">🍽️</span>
+            <span className="mt-3 block text-sm font-bold text-gray-700">All</span>
+            <span className="mt-1 block text-xs text-gray-400">{items.length} items</span>
+          </button>
+          {CATEGORIES.map((c) => (
+            <button
+              key={c}
+              onClick={() => setCategoryFilter(c)}
+              className={`rounded-2xl border bg-white p-5 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-orange-300 hover:shadow-lg hover:shadow-orange-100 ${
+                categoryFilter === c ? 'border-orange-300 ring-4 ring-orange-100' : 'border-transparent'
+              }`}
+            >
+              <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-orange-50 text-3xl">{CATEGORY_ICONS[c]}</span>
+              <span className="mt-3 block text-sm font-bold capitalize text-gray-700">{c}</span>
+              <span className="mt-1 block text-xs text-gray-400">{categoryCounts[c] || 0} items</span>
+            </button>
+          ))}
+        </div>
+      </section>
 
-      {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {displayed.map((item) => (
-          <div key={item._id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-col gap-3">
-            <MenuImage
-              src={itemImageUrl(item)}
-              alt={item.name}
-              className="h-36 w-full rounded-lg"
-            />
-
-            {/* Top row */}
-            <div className="flex justify-between items-start gap-2">
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-800 truncate">{item.name}</p>
+      {popularItems.length > 0 && (
+        <section className="mb-7">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-extrabold text-gray-900">Popular This Week</h2>
+            <button
+              onClick={() => { setCategoryFilter(''); setSearch(''); }}
+              className="text-sm font-bold text-orange-500 hover:text-orange-600"
+            >View all ›</button>
+          </div>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-4">
+            {popularItems.map((item) => (
+              <article
+                key={item._id}
+                className="rounded-2xl border border-transparent bg-white p-5 shadow-sm transition hover:border-orange-300 hover:shadow-lg hover:shadow-orange-100"
+              >
+                <div className="flex gap-4">
+                  <MenuImage
+                    src={itemImageUrl(item)}
+                    alt={item.name}
+                    className="h-20 w-20 shrink-0 rounded-2xl"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h3 className="truncate text-base font-extrabold text-gray-900">{item.name}</h3>
+                        <p className="mt-1 text-lg font-extrabold text-gray-900">
+                          <span className="text-orange-500">{formatCurrency(item.price).slice(0, 1)}</span>{formatCurrency(item.price).slice(1)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setItemModal(item)}
+                        className="rounded-full px-2 text-xl leading-none text-gray-400 hover:bg-orange-50 hover:text-orange-500"
+                        aria-label={`Edit ${item.name}`}
+                      >•••</button>
+                    </div>
+                    <p className="mt-2 text-xs text-gray-400">★ 5.0 · {item.preparationTime} min prep</p>
+                  </div>
+                </div>
                 {item.description && (
-                  <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">{item.description}</p>
+                  <p className="mt-4 line-clamp-2 text-sm leading-relaxed text-gray-400">{item.description}</p>
                 )}
-              </div>
-              <span className={`text-xs px-2 py-0.5 rounded-full capitalize shrink-0 ${CATEGORY_COLORS[item.category]}`}>
-                {item.category}
-              </span>
-            </div>
-
-            {/* Tags */}
-            {item.tags?.length > 0 && (
-              <div className="flex gap-1 flex-wrap">
-                {item.tags.map((t) => (
-                  <span key={t} className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{t}</span>
-                ))}
-              </div>
-            )}
-
-            {/* Price + margin row */}
-            <div className="flex items-center justify-between">
-              <span className="text-orange-500 font-bold text-lg">{formatCurrency(item.price)}</span>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-400">⏱ {item.preparationTime}m</span>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${item.isAvailable ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                  {item.isAvailable ? 'Available' : 'Off menu'}
-                </span>
-              </div>
-            </div>
-
-            {/* Recipe status */}
-            <div className="flex items-center justify-between text-xs border-t border-gray-100 pt-2">
-              <span className="text-gray-500">
-                {item.recipe
-                  ? `📋 ${item.recipe.ingredients.length} ingredient${item.recipe.ingredients.length !== 1 ? 's' : ''}`
-                  : '📋 No recipe'}
-              </span>
-              <button
-                onClick={() => setRecipeModal(item)}
-                className="text-orange-500 hover:text-orange-600 font-medium"
-              >{item.recipe ? 'Edit recipe' : 'Add recipe'}</button>
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={() => setItemModal(item)}
-                className="flex-1 text-xs border border-gray-200 text-gray-600 py-1.5 rounded-lg hover:bg-gray-50"
-              >Edit</button>
-              <button
-                onClick={() => handleDelete(item._id)}
-                className="text-xs border border-red-200 text-red-500 px-3 py-1.5 rounded-lg hover:bg-red-50"
-              >Delete</button>
-            </div>
+              </article>
+            ))}
           </div>
-        ))}
+        </section>
+      )}
 
-        {displayed.length === 0 && (
-          <div className="col-span-3 text-center py-16 text-gray-400">
-            No menu items found
-          </div>
-        )}
-      </div>
+      <section>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-extrabold text-gray-900">Best Seller</h2>
+          <p className="text-sm font-semibold text-gray-400">{displayed.length} item{displayed.length === 1 ? '' : 's'}</p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+          {displayed.map((item) => (
+            <article key={item._id} className="group overflow-hidden rounded-2xl bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl hover:shadow-orange-100">
+              <div className="relative p-5 pb-0">
+                <button
+                  onClick={() => setItemModal(item)}
+                  className="absolute right-4 top-4 z-10 rounded-full px-2 text-xl leading-none text-gray-400 hover:bg-orange-50 hover:text-orange-500"
+                  aria-label={`Edit ${item.name}`}
+                >•••</button>
+                <MenuImage
+                  src={itemImageUrl(item)}
+                  alt={item.name}
+                  className="h-40 w-full rounded-2xl bg-gray-50 object-contain"
+                />
+              </div>
+
+              <div className="space-y-4 p-5">
+                <div>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-bold capitalize ${CATEGORY_COLORS[item.category]}`}>
+                      {CATEGORY_ICONS[item.category]} {item.category}
+                    </span>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${item.isAvailable ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {item.isAvailable ? 'Available' : 'Off menu'}
+                    </span>
+                  </div>
+                  <h3 className="truncate text-base font-extrabold text-gray-900">{item.name}</h3>
+                  {item.description && (
+                    <p className="mt-2 line-clamp-2 min-h-[2.5rem] text-sm leading-relaxed text-gray-400">{item.description}</p>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <p className="text-2xl font-extrabold text-gray-900">
+                    <span className="text-orange-500">{formatCurrency(item.price).slice(0, 1)}</span>{formatCurrency(item.price).slice(1)}
+                  </p>
+                  <span className="text-xs font-semibold text-gray-400">Sold 1k</span>
+                </div>
+
+                {item.tags?.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {item.tags.slice(0, 3).map((t) => (
+                      <span key={t} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">{t}</span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between border-t border-gray-100 pt-4 text-xs">
+                  <span className="font-semibold text-gray-500">
+                    {item.recipe
+                      ? `${item.recipe.ingredients.length} ingredient${item.recipe.ingredients.length !== 1 ? 's' : ''}`
+                      : 'No recipe'}
+                  </span>
+                  <button
+                    onClick={() => setRecipeModal(item)}
+                    className="font-bold text-orange-500 hover:text-orange-600"
+                  >{item.recipe ? 'Edit recipe' : 'Add recipe'}</button>
+                </div>
+
+                <div className="grid grid-cols-[1fr_auto] gap-2">
+                  <button
+                    onClick={() => setItemModal(item)}
+                    className="rounded-xl border border-gray-200 py-2 text-xs font-bold text-gray-600 transition hover:bg-gray-50"
+                  >Edit</button>
+                  <button
+                    onClick={() => handleDelete(item._id)}
+                    className="rounded-xl border border-red-200 px-4 py-2 text-xs font-bold text-red-500 transition hover:bg-red-50"
+                  >Delete</button>
+                </div>
+              </div>
+            </article>
+          ))}
+
+          {displayed.length === 0 && (
+            <div className="col-span-full rounded-3xl border border-dashed border-orange-200 bg-white py-16 text-center shadow-sm">
+              <p className="text-base font-bold text-gray-700">No menu items found</p>
+              <p className="mt-1 text-sm text-gray-400">Try another search or add a new menu item.</p>
+              <button
+                onClick={() => setItemModal('new')}
+                className="mt-5 rounded-2xl bg-orange-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-orange-200 hover:bg-orange-600"
+              >Add New Menu</button>
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* Modals */}
       {itemModal && (
