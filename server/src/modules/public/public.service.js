@@ -125,7 +125,11 @@ export const getPublicMenu = async (restaurantId, _branchId) => {
   assertObjectId(restaurantId, 'restaurantId');
 
   const items = await MenuItem.find({
-    restaurant: restaurantId,
+    $or: [
+      { restaurant: restaurantId },
+      { restaurant: { $exists: false } },
+      { restaurant: null },
+    ],
     isAvailable: true,
   })
     .select('name description price category imageUrl tags allergens preparationTime isAvailable')
@@ -232,7 +236,11 @@ export const createCustomerOrder = async ({
     const menuIds = itemInputs.map((i) => i.menuItem);
     const menuItems = await MenuItem.find({
       _id: { $in: menuIds },
-      restaurant: restaurantId,
+      $or: [
+        { restaurant: restaurantId },
+        { restaurant: { $exists: false } },
+        { restaurant: null },
+      ],
       isAvailable: true,
     }).session(session);
 
