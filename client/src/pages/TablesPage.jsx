@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
-import { fetchTables, updateTable, fetchTableQR } from '../api/tables.api.js';
+import { fetchTables, createTable, updateTable, fetchTableQR } from '../api/tables.api.js';
 
 const STATUS_STYLES = {
   available: { card: 'border-green-300 bg-green-50',  badge: 'bg-green-100 text-green-700',  label: 'Available' },
@@ -74,11 +74,154 @@ function QRModal({ qrData, onClose }) {
   );
 }
 
+function AddTableModal({ onClose, onCreated }) {
+  const [form, setForm] = useState({
+    number: '',
+    capacity: '4',
+    location: 'indoor',
+    status: 'available',
+  });
+  const [saving, setSaving] = useState(false);
+
+  const set = (field, value) => setForm((current) => ({ ...current, [field]: value }));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const number = Number(form.number);
+    const capacity = Number(form.capacity);
+
+    if (!Number.isInteger(number) || number < 1) {
+      toast.error('Table number must be a positive whole number');
+      return;
+    }
+
+    if (!Number.isInteger(capacity) || capacity < 1) {
+      toast.error('Capacity must be at least 1');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await createTable({
+        number,
+        capacity,
+        location: form.location,
+        status: form.status,
+      });
+      toast.success(`Table ${number} created`);
+      onCreated();
+      onClose();
+    } catch (err) {
+      const message = err.response?.data?.message;
+      toast.error(message || 'Failed to create table');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-bold text-gray-800 text-lg">Add Table</h3>
+            <p className="text-sm text-gray-500 mt-0.5">Create a new dining table for this branch.</p>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="text-gray-400 hover:text-gray-600 text-2xl leading-none disabled:opacity-50"
+          >
+            ✕
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Table Number</label>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                required
+                value={form.number}
+                onChange={(e) => set('number', e.target.value)}
+                className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                placeholder="12"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Capacity</label>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                required
+                value={form.capacity}
+                onChange={(e) => set('capacity', e.target.value)}
+                className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                placeholder="4"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+              <select
+                value={form.location}
+                onChange={(e) => set('location', e.target.value)}
+                className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+              >
+                <option value="indoor">Indoor</option>
+                <option value="outdoor">Outdoor</option>
+                <option value="bar">Bar</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <select
+                value={form.status}
+                onChange={(e) => set('status', e.target.value)}
+                className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+              >
+                <option value="available">Available</option>
+                <option value="reserved">Reserved</option>
+                <option value="cleaning">Cleaning</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="flex-1 border border-gray-300 text-gray-700 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 bg-orange-500 text-white rounded-xl py-2.5 text-sm font-medium hover:bg-orange-600 transition-colors disabled:opacity-50"
+            >
+              {saving ? 'Creating...' : 'Create Table'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function TablesPage() {
   const [tables, setTables] = useState([]);
   const [locationFilter, setLocationFilter] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
   const [qrModal, setQrModal] = useState(null); // qrData object or null
   const [qrLoading, setQrLoading] = useState(null); // tableId being loaded
   const navigate = useNavigate();
@@ -126,10 +269,16 @@ export default function TablesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-800">Tables</h2>
-        <button
-          onClick={() => navigate('/pos')}
-          className="text-sm bg-orange-500 text-white px-3 py-1.5 rounded-lg hover:bg-orange-600"
-        >🧾 Open POS</button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="text-sm bg-orange-500 text-white px-3 py-1.5 rounded-lg hover:bg-orange-600"
+          >＋ Add Table</button>
+          <button
+            onClick={() => navigate('/pos')}
+            className="text-sm border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50"
+          >🧾 Open POS</button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -219,6 +368,12 @@ export default function TablesPage() {
       </div>
 
       {/* QR Modal */}
+      {showAddModal && (
+        <AddTableModal
+          onClose={() => setShowAddModal(false)}
+          onCreated={load}
+        />
+      )}
       {qrModal && <QRModal qrData={qrModal} onClose={() => setQrModal(null)} />}
     </div>
   );
