@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { tenantFields, addTenantIndexes } from '../../plugins/tenantPlugin.js';
+import OrderCounter from './orderCounter.model.js';
 
 // ─── Sub-schemas ──────────────────────────────────────────────────────────────
 
@@ -103,13 +104,16 @@ const orderSchema = new mongoose.Schema(
 // ─── Tenant fields ────────────────────────────────────────────────────────────
 orderSchema.add(tenantFields(true)); // restaurant + branch scoped
 
-// ─── Pre-save: generate orderNumber scoped to restaurant ─────────────────────
+// ─── Pre-save: generate globally unique sequential orderNumber ───────────────
 
 orderSchema.pre('save', async function (next) {
   if (this.isNew && !this.orderNumber) {
-    // Scope order number to restaurant so ORD-0001 can exist in multiple restaurants
-    const count = await mongoose.model('Order').countDocuments({ restaurant: this.restaurant });
-    this.orderNumber = `ORD-${String(count + 1).padStart(4, '0')}`;
+    const counter = await OrderCounter.findOneAndUpdate(
+      { key: 'orderNumber' },
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true }
+    );
+    this.orderNumber = `ORD-${String(counter.seq).padStart(6, '0')}`;
   }
   next();
 });

@@ -68,12 +68,10 @@ export const createOrder = async ({ tableId, itemInputs, notes, taxRate, userId,
       throw Object.assign(new Error(`Table ${table.number} is already occupied`), { status: 409 });
     }
 
-    // Validate + snapshot menu items — scope to restaurant when available
+    // Validate + snapshot menu items. Menu items may be shared/legacy records,
+    // so match the POS menu list behavior: accept available items by ID.
     const menuIds = itemInputs.map((i) => i.menuItem);
-    const menuQuery = restaurantId
-      ? { _id: { $in: menuIds }, isAvailable: true, restaurant: restaurantId }
-      : { _id: { $in: menuIds }, isAvailable: true };
-    const menuItems = await MenuItem.find(menuQuery).session(session);
+    const menuItems = await MenuItem.find({ _id: { $in: menuIds }, isAvailable: true }).session(session);
     const menuMap = new Map(menuItems.map((m) => [m._id.toString(), m]));
 
     const items = itemInputs.map((input) => {
