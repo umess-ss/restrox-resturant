@@ -12,6 +12,7 @@ import POSPage from './pages/POSPage.jsx';
 import KDSPage from './pages/KDSPage.jsx';
 import OnboardPage from './pages/OnboardPage.jsx';
 import LandingPage from './pages/LandingPage.jsx';
+import NotificationsPage from './pages/NotificationsPage.jsx';
 import CustomerTablePage from './pages/customer/CustomerTablePage.jsx';
 import CustomerOrderStatusPage from './pages/customer/CustomerOrderStatusPage.jsx';
 
@@ -54,6 +55,7 @@ export default function App() {
         <Route path="inventory" element={<InventoryPage />} />
         <Route path="pos" element={<POSPage />} />
         <Route path="kds" element={<KDSPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
       </Route>
     </Routes>
   );

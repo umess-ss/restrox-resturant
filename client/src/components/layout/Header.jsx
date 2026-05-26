@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import useAuthStore from '../../store/authStore.js';
 import useTenantStore from '../../store/tenantStore.js';
+import useNotificationStore from '../../store/notificationStore.js';
 import { useSocketContext } from '../../socket/SocketContext.jsx';
 import { EVENTS } from '../../socket/events.js';
 
@@ -13,24 +15,18 @@ export default function Header() {
   const { user, logout } = useAuthStore();
   const restaurant = useTenantStore((s) => s.restaurant);
   const { socket } = useSocketContext();
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const notifications = useNotificationStore((s) => s.notifications);
+  const addWaiterCall = useNotificationStore((s) => s.addWaiterCall);
+  const markAllRead = useNotificationStore((s) => s.markAllRead);
+  const clearNotifications = useNotificationStore((s) => s.clear);
   const [showNotifications, setShowNotifications] = useState(false);
+  const unreadCount = notifications.filter((item) => !item.read).length;
 
   useEffect(() => {
     if (!socket) return;
 
     const handleWaiterCall = (payload) => {
-      const tableNumber = payload.tableNumber || '?';
-      const notification = {
-        id: `${payload.orderId || tableNumber}-${payload.createdAt || Date.now()}`,
-        title: `Table ${tableNumber} has called you`,
-        detail: [payload.customerName, payload.customerPhone].filter(Boolean).join(' · '),
-        createdAt: payload.createdAt || new Date().toISOString(),
-      };
-
-      setNotifications((current) => [notification, ...current].slice(0, 10));
-      setUnreadCount((count) => count + 1);
+      addWaiterCall(payload);
     };
 
     socket.on(EVENTS.CUSTOMER_CALL_WAITER, handleWaiterCall);
@@ -40,12 +36,12 @@ export default function Header() {
       socket.off(EVENTS.CUSTOMER_CALL_WAITER, handleWaiterCall);
       socket.off('waiter:called', handleWaiterCall);
     };
-  }, [socket]);
+  }, [socket, addWaiterCall]);
 
   const toggleNotifications = () => {
     setShowNotifications((open) => {
       const next = !open;
-      if (next) setUnreadCount(0);
+      if (next) markAllRead();
       return next;
     });
   };
@@ -87,7 +83,7 @@ export default function Header() {
                 {notifications.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => setNotifications([])}
+                    onClick={clearNotifications}
                     className="text-xs font-medium text-gray-400 hover:text-red-500"
                   >
                     Clear
@@ -98,7 +94,7 @@ export default function Header() {
                 {notifications.length === 0 ? (
                   <p className="px-4 py-6 text-center text-sm text-gray-400">No waiter calls yet</p>
                 ) : (
-                  notifications.map((notification) => (
+                  notifications.slice(0, 6).map((notification) => (
                     <div key={notification.id} className="border-b border-gray-100 px-4 py-3 last:border-b-0">
                       <div className="flex items-start gap-3">
                         <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm text-orange-600">
@@ -116,6 +112,13 @@ export default function Header() {
                   ))
                 )}
               </div>
+              <Link
+                to="/notifications"
+                onClick={() => setShowNotifications(false)}
+                className="block border-t border-gray-100 bg-gray-50 px-4 py-3 text-center text-xs font-bold text-orange-600 hover:bg-orange-50"
+              >
+                View all notifications
+              </Link>
             </div>
           )}
         </div>
