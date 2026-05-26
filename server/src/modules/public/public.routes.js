@@ -17,6 +17,7 @@ import {
   getBill,
   requestBill,
   receiptPdf,
+  submitFeedback,
 } from './public.controller.js';
 
 const router = Router();
@@ -79,6 +80,19 @@ router.get('/orders/:orderId/status', getStatus);
 router.get('/orders/:orderId/bill', getBill);
 router.post('/orders/:orderId/request-bill', callWaiterLimiter, requestBill);
 router.get('/orders/:orderId/receipt/pdf', receiptPdf);
+
+// ─── Customer feedback ───────────────────────────────────────────────────────
+router.post(
+  '/orders/:orderId/feedback',
+  [
+    body('rating').isInt({ min: 1, max: 5 }).withMessage('Rating must be between 1 and 5'),
+    body('comment').optional({ values: 'falsy' }).trim().isLength({ max: 600 }),
+    body('customerName').optional({ values: 'falsy' }).trim().isLength({ max: 80 }),
+    body('customerPhone').optional({ values: 'falsy' }).trim().isLength({ max: 30 }),
+  ],
+  validate,
+  submitFeedback
+);
 
 // ─── Call waiter ──────────────────────────────────────────────────────────────
 router.post('/orders/:orderId/call-waiter', callWaiterLimiter, callWaiter);

@@ -45,6 +45,9 @@ export const requestPublicBill = (orderId) =>
 export const publicReceiptPdfUrl = (orderId) =>
   buildApiUrl(`/public/orders/${orderId}/receipt/pdf`);
 
+export const submitPublicFeedback = (orderId, data) =>
+  pub.post(`/public/orders/${orderId}/feedback`, data).then((r) => r.data);
+
 // ─── Call waiter ──────────────────────────────────────────────────────────────
 export const callPublicWaiter = (orderId) =>
   pub.post(`/public/orders/${orderId}/call-waiter`).then((r) => r.data);

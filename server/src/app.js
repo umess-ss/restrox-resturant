@@ -17,6 +17,7 @@ import analyticsRoutes from './modules/analytics/analytics.routes.js';
 import saasRoutes from './modules/saas/restaurant.routes.js';
 import publicRoutes from './modules/public/public.routes.js';
 import paymentRoutes from './modules/payments/payment.routes.js';
+import feedbackRoutes from './modules/feedback/feedback.routes.js';
 import { errorHandler, notFound } from './middlewares/error.middleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -95,6 +96,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/saas', saasRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 // Health check
 app.get('/api/health', (_, res) => res.json({

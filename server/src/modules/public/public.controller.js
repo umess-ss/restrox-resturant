@@ -14,6 +14,7 @@ import {
   requestBillForOrder,
   getReceiptPdf,
 } from './public.service.js';
+import { submitPublicFeedback } from '../feedback/feedback.controller.js';
 
 // ─── GET /api/public/restaurants/:restaurantId/branches/:branchId/tables/:tableId
 
@@ -104,3 +105,5 @@ export const callWaiter = async (req, res) => {
   const result = await callWaiterForOrder(req.params.orderId);
   res.json(result);
 };
+
+export const submitFeedback = submitPublicFeedback;

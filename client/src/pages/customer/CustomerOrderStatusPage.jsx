@@ -6,6 +6,7 @@ import {
   requestPublicBill,
   publicReceiptPdfUrl,
   callPublicWaiter,
+  submitPublicFeedback,
 } from '../../api/public.api.js';
 import { initiatePublicPayment, verifyPublicPayment } from '../../api/payments.api.js';
 import usePublicOrderSocket from '../../hooks/usePublicOrderSocket.js';
@@ -169,6 +170,72 @@ function BillPreview({ bill, onClose }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function FeedbackForm({ orderId }) {
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await submitPublicFeedback(orderId, { rating, comment });
+      setSubmitted(true);
+    } catch {
+      alert('Could not submit feedback. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (submitted) {
+    return (
+      <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 text-center">
+        <p className="text-2xl mb-2">★</p>
+        <p className="font-bold text-orange-700">Thank you for your feedback</p>
+        <p className="text-sm text-orange-600 mt-1">Your review helps the restaurant improve.</p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+      <div>
+        <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Rate your experience</h2>
+        <p className="text-xs text-gray-400 mt-1">Tell us how your visit went.</p>
+      </div>
+      <div className="flex justify-center gap-1">
+        {[1, 2, 3, 4, 5].map((value) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setRating(value)}
+            className={`text-3xl ${value <= rating ? 'text-orange-400' : 'text-gray-200'}`}
+            aria-label={`${value} star rating`}
+          >
+            ★
+          </button>
+        ))}
+      </div>
+      <textarea
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        rows={3}
+        maxLength={600}
+        placeholder="Write a short comment..."
+        className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-orange-300 focus:ring-4 focus:ring-orange-100"
+      />
+      <button
+        disabled={loading}
+        className="w-full rounded-2xl bg-orange-500 py-4 text-base font-bold text-white shadow-lg shadow-orange-100 disabled:opacity-50"
+      >
+        {loading ? 'Submitting...' : 'Submit Feedback'}
+      </button>
+    </form>
   );
 }
 
@@ -415,6 +482,10 @@ export default function CustomerOrderStatusPage() {
               Download Receipt PDF
             </a>
           </div>
+        )}
+
+        {['served', 'paid'].includes(order.status) && (
+          <FeedbackForm orderId={orderId} />
         )}
 
         {order.paymentStatus !== 'paid' && (
