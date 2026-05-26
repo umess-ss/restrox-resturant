@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { toast } from 'react-toastify';
 import {
   fetchOrders,
@@ -317,6 +317,207 @@ function OrderRow({ order, onAdvance, onBill, onCancel, onKOT, onBillPresented, 
   );
 }
 
+function formatOrderDate(value) {
+  if (!value) return '';
+  return new Date(value).toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function OrderStatusButton({ order }) {
+  const status = order.paymentStatus === 'paid' ? 'paid' : order.status;
+  const statusClass = {
+    pending: 'border-yellow-300 bg-yellow-50 text-yellow-700',
+    confirmed: 'border-orange-300 bg-orange-50 text-orange-700',
+    preparing: 'border-blue-300 bg-blue-50 text-blue-700',
+    ready: 'border-sky-300 bg-sky-50 text-sky-700',
+    served: 'border-orange-300 bg-orange-50 text-orange-700',
+    paid: 'border-green-300 bg-green-50 text-green-700',
+    cancelled: 'border-red-300 bg-red-50 text-red-600',
+  }[status] || 'border-gray-200 bg-gray-50 text-gray-500';
+
+  const label = status === 'confirmed'
+    ? 'Delivering to you'
+    : status === 'preparing'
+      ? 'Order being prepared'
+      : STATUS_META[status]?.label || status;
+
+  return (
+    <span className={`block rounded-xl border px-4 py-2 text-center text-xs font-bold capitalize ${statusClass}`}>
+      {label}
+    </span>
+  );
+}
+
+function FoodOrderCard({ order, selected, highlighted, onSelect }) {
+  const visibleItems = order.items?.slice(0, 2) || [];
+
+  return (
+    <button
+      onClick={() => onSelect(order._id)}
+      className={`flex h-full flex-col rounded-2xl border bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-orange-300 hover:shadow-lg hover:shadow-orange-100 ${
+        selected ? 'border-orange-300 ring-4 ring-orange-100' : 'border-transparent'
+      } ${highlighted ? 'ring-4 ring-orange-300' : ''}`}
+    >
+      <div className="text-center">
+        <h3 className="text-base font-extrabold text-gray-900">{order.orderNumber}</h3>
+        <p className="mt-1 text-xs text-gray-400">{formatOrderDate(order.createdAt)}</p>
+      </div>
+
+      <div className="my-4 border-t border-gray-100" />
+
+      <div>
+        <p className="text-sm font-extrabold text-gray-900">Table {getTableNumber(order)}</p>
+        <p className="mt-2 text-xs text-gray-400">
+          <span className="text-orange-500">★</span> {order.waiter?.name || order.customerName || 'Restaurant order'}
+        </p>
+      </div>
+
+      <div className="my-4 grid grid-cols-2 gap-2 border-y border-gray-100 py-3 text-xs">
+        <span className="text-gray-400">Order time</span>
+        <span className="text-right font-bold text-gray-900">{order.preparationTime || 10} Min</span>
+        <span className="text-gray-400">Items</span>
+        <span className="text-right font-bold text-gray-900">{order.items?.length || 0}</span>
+      </div>
+
+      <div className="flex-1">
+        <p className="mb-3 text-sm font-extrabold text-gray-900">Order Menu</p>
+        <div className="space-y-3">
+          {visibleItems.map((item) => (
+            <div key={item._id || item.menuItem} className="flex items-center gap-3">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-orange-50 text-xl">🍽️</div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-extrabold text-gray-900">{item.name}</p>
+                <p className="text-xs text-gray-400">x{item.quantity}</p>
+              </div>
+              <p className="text-xs font-extrabold text-gray-900">
+                <span className="text-orange-500">+</span>{formatCurrency((item.price || 0) * (item.quantity || 0))}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-4 border-t border-gray-100 pt-4">
+        <div className="mb-4 flex items-center justify-between">
+          <span className="text-sm font-bold text-gray-900">Total</span>
+          <span className="text-base font-extrabold text-gray-900">
+            <span className="text-orange-500">{formatCurrency(order.totalAmount).slice(0, 1)}</span>{formatCurrency(order.totalAmount).slice(1)}
+          </span>
+        </div>
+        <OrderStatusButton order={order} />
+      </div>
+    </button>
+  );
+}
+
+function OrderTrackerPanel({ order, onAdvance, onBill, onCancel, onKOT, onBillPresented }) {
+  if (!order) {
+    return (
+      <aside className="rounded-3xl bg-white p-8 text-center shadow-sm">
+        <p className="font-bold text-gray-700">No order selected</p>
+        <p className="mt-1 text-sm text-gray-400">Select an order to view its tracker.</p>
+      </aside>
+    );
+  }
+
+  const nextStatus = NEXT_STATUS[order.status];
+  const total = formatCurrency(order.totalAmount);
+
+  return (
+    <aside className="rounded-3xl bg-white p-6 shadow-sm xl:sticky xl:top-6">
+      <h2 className="text-xl font-extrabold text-gray-900">Order Tracker</h2>
+
+      <div className="mt-6 overflow-hidden rounded-2xl border border-gray-100 bg-gray-50">
+        <div className="relative h-56 bg-[linear-gradient(90deg,#e5e7eb_1px,transparent_1px),linear-gradient(#e5e7eb_1px,transparent_1px)] bg-[length:34px_34px]">
+          <div className="absolute left-1/2 top-8 h-32 w-1 -translate-x-1/2 rounded-full bg-orange-400" />
+          <div className="absolute left-[26%] top-[70%] h-1 w-[48%] rounded-full bg-orange-400" />
+          <div className="absolute left-1/2 top-8 h-5 w-5 -translate-x-1/2 rounded-full border-4 border-orange-100 bg-orange-500 shadow-lg" />
+          <div className="absolute left-[26%] top-[66%] grid h-8 w-8 place-items-center rounded-full bg-orange-500 text-xs font-bold text-white shadow-lg">›</div>
+        </div>
+      </div>
+
+      <div className="mt-6">
+        <p className="text-sm font-semibold text-gray-400">Table Address</p>
+        <p className="mt-2 text-sm font-extrabold text-gray-900">
+          <span className="text-orange-500">⌖</span> Table {getTableNumber(order)}
+        </p>
+        <p className="mt-2 text-sm leading-relaxed text-gray-400">
+          {order.customerNote || order.customerName || order.waiter?.name || 'Restaurant floor order'}
+        </p>
+        <CustomerInfo order={order} />
+      </div>
+
+      <div className="mt-8">
+        <h3 className="text-lg font-extrabold text-gray-900">Order Menu</h3>
+        <div className="mt-4 space-y-4">
+          {order.items?.map((item) => (
+            <div key={item._id || item.menuItem} className="flex items-center gap-3">
+              <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-orange-50 text-2xl">🍽️</div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-extrabold text-gray-900">{item.name}</p>
+                <p className="text-xs text-gray-400">x{item.quantity}</p>
+              </div>
+              <p className="text-sm font-extrabold text-gray-900">
+                <span className="text-orange-500">+</span>{formatCurrency((item.price || 0) * (item.quantity || 0))}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-6 border-t border-gray-100 pt-5">
+        <div className="flex items-center justify-between">
+          <span className="font-bold text-gray-900">Total</span>
+          <span className="text-2xl font-extrabold text-gray-900">
+            <span className="text-orange-500">{total.slice(0, 1)}</span>{total.slice(1)}
+          </span>
+        </div>
+        <div className="mt-5">
+          <OrderStatusButton order={order} />
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+        {nextStatus && (
+          <button
+            onClick={() => onAdvance(order._id, order.status)}
+            className="rounded-xl bg-orange-500 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-orange-200 hover:bg-orange-600"
+          >Mark {nextStatus}</button>
+        )}
+        {order.status === 'confirmed' && (
+          <button
+            onClick={() => onKOT(order._id)}
+            className="rounded-xl border border-orange-300 bg-white px-4 py-3 text-sm font-bold text-orange-600 hover:bg-orange-50"
+          >Send KOT</button>
+        )}
+        {order.source === 'customer_qr' && order.billStatus === 'requested' && (
+          <button
+            onClick={() => onBillPresented(order._id)}
+            className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-600 hover:bg-blue-100"
+          >Bill Presented</button>
+        )}
+        {['served', 'ready'].includes(order.status) && order.paymentStatus !== 'paid' && (
+          <button
+            onClick={() => onBill(order._id)}
+            className="rounded-xl bg-green-500 px-4 py-3 text-sm font-bold text-white hover:bg-green-600"
+          >Bill / Checkout</button>
+        )}
+        {!['paid', 'cancelled'].includes(order.status) && (
+          <button
+            onClick={() => onCancel(order._id)}
+            className="rounded-xl border border-red-200 bg-white px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50"
+          >Cancel Order</button>
+        )}
+      </div>
+    </aside>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function OrdersPage() {
@@ -324,6 +525,8 @@ export default function OrdersPage() {
   const [kitchenOrders, setKitchenOrders] = useState([]);
   const [view, setView] = useState('orders'); // 'orders' | 'kitchen'
   const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useState('');
+  const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [billOrderId, setBillOrderId] = useState(null);
   const [newOrderNotice, setNewOrderNotice] = useState('');
   const [highlightedOrderId, setHighlightedOrderId] = useState(null);
@@ -452,82 +655,146 @@ export default function OrdersPage() {
   };
 
   const STATUS_FILTERS = ['', 'pending', 'confirmed', 'preparing', 'ready', 'served', 'paid', 'cancelled'];
+  const ordersArray = useMemo(() => Array.isArray(orders) ? orders : [], [orders]);
+  const displayedOrders = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return ordersArray.filter((order) => {
+      const searchable = [
+        order.orderNumber,
+        getTableNumber(order),
+        order.customerName,
+        order.customerPhone,
+        order.waiter?.name,
+        order.status,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return !query || searchable.includes(query);
+    });
+  }, [ordersArray, search]);
+  const selectedOrder = useMemo(
+    () => displayedOrders.find((order) => order._id === selectedOrderId) || displayedOrders[0] || null,
+    [displayedOrders, selectedOrderId]
+  );
+
+  useEffect(() => {
+    if (!displayedOrders.length) {
+      setSelectedOrderId(null);
+      return;
+    }
+    if (!selectedOrderId || !displayedOrders.some((order) => order._id === selectedOrderId)) {
+      setSelectedOrderId(displayedOrders[0]._id);
+    }
+  }, [displayedOrders, selectedOrderId]);
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h2 className="text-xl font-semibold text-gray-800">Orders</h2>
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${connected ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-            {connected ? '● Live' : '○ Offline'}
-          </span>
+    <div className="-m-4 min-h-[calc(100vh-3.5rem)] bg-[#f7f7f7] p-4 lg:-m-6 lg:p-6">
+      <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wide text-orange-500">Restaurant orders</p>
+          <div className="mt-1 flex items-center gap-3">
+            <h1 className="text-3xl font-extrabold text-gray-900">Food Order</h1>
+            <span className={`rounded-full px-3 py-1 text-xs font-bold ${connected ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
+              {connected ? '● Live' : '○ Offline'}
+            </span>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setView('orders')}
-            className={`text-sm px-3 py-1.5 rounded-lg border transition-colors ${view === 'orders' ? 'bg-gray-800 text-white border-gray-800' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
-          >📋 All Orders</button>
-          <button
-            onClick={() => setView('kitchen')}
-            className={`text-sm px-3 py-1.5 rounded-lg border transition-colors ${view === 'kitchen' ? 'bg-orange-500 text-white border-orange-500' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
-          >👨‍🍳 Kitchen {kitchenOrders.length > 0 && <span className="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5">{kitchenOrders.length}</span>}</button>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <label className="relative block">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-orange-400">⌕</span>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search order"
+              className="h-12 w-full rounded-2xl border border-transparent bg-white pl-12 pr-4 text-sm text-gray-800 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-orange-200 focus:ring-4 focus:ring-orange-100 sm:w-80"
+            />
+          </label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setView('orders')}
+              className={`rounded-2xl border px-4 py-3 text-sm font-bold transition ${view === 'orders' ? 'border-orange-500 bg-orange-500 text-white shadow-lg shadow-orange-200' : 'border-gray-200 bg-white text-gray-600 hover:bg-orange-50'}`}
+            >All Orders</button>
+            <button
+              onClick={() => setView('kitchen')}
+              className={`rounded-2xl border px-4 py-3 text-sm font-bold transition ${view === 'kitchen' ? 'border-orange-500 bg-orange-500 text-white shadow-lg shadow-orange-200' : 'border-gray-200 bg-white text-gray-600 hover:bg-orange-50'}`}
+            >Kitchen {kitchenOrders.length > 0 && <span className="ml-1 rounded-full bg-red-500 px-1.5 py-0.5 text-xs text-white">{kitchenOrders.length}</span>}</button>
+          </div>
         </div>
       </div>
 
       {newOrderNotice && (
-        <div className="bg-orange-50 border border-orange-200 text-orange-800 rounded-xl px-4 py-2 text-sm font-semibold">
+        <div className="mb-5 rounded-2xl border border-orange-200 bg-orange-50 px-5 py-3 text-sm font-bold text-orange-800">
           {newOrderNotice}
         </div>
       )}
 
       {view === 'orders' && (
-        <>
-          {/* Status filter */}
-          <div className="flex gap-2 flex-wrap">
-            {STATUS_FILTERS.map((s) => (
-              <button
-                key={s || 'all'}
-                onClick={() => setStatusFilter(s)}
-                className={`text-xs px-3 py-1 rounded-full border capitalize transition-colors ${statusFilter === s ? 'bg-gray-800 text-white border-gray-800' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
-              >{s || 'All'}</button>
-            ))}
-          </div>
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
+          <main className="min-w-0">
+            <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
+              {STATUS_FILTERS.map((s) => (
+                <button
+                  key={s || 'all'}
+                  onClick={() => setStatusFilter(s)}
+                  className={`shrink-0 rounded-xl border px-4 py-2 text-xs font-bold capitalize transition ${statusFilter === s ? 'border-orange-500 bg-orange-500 text-white shadow-md shadow-orange-100' : 'border-gray-200 bg-white text-gray-500 hover:border-orange-200 hover:bg-orange-50'}`}
+                >{s || 'All'}</button>
+              ))}
+            </div>
 
-          {/* Orders list */}
-          <div className="space-y-2">
-            {(Array.isArray(orders) ? orders : []).map((order) => (
-              <OrderRow
-                key={order._id}
-                order={order}
-                onAdvance={advance}
-                onBill={setBillOrderId}
-                onCancel={cancel}
-                onKOT={sendKOT}
-                onBillPresented={presentBill}
-                highlighted={highlightedOrderId === order._id}
-              />
-            ))}
-            {orders.length === 0 && (
-              <div className="text-center py-12 text-gray-400">No orders found</div>
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-3">
+              {displayedOrders.map((order) => (
+                <FoodOrderCard
+                  key={order._id}
+                  order={order}
+                  selected={selectedOrder?._id === order._id}
+                  highlighted={highlightedOrderId === order._id}
+                  onSelect={setSelectedOrderId}
+                />
+              ))}
+            </div>
+
+            {displayedOrders.length === 0 && (
+              <div className="rounded-3xl border border-dashed border-orange-200 bg-white py-16 text-center shadow-sm">
+                <p className="font-bold text-gray-700">No orders found</p>
+                <p className="mt-1 text-sm text-gray-400">Try another search or status filter.</p>
+              </div>
             )}
-          </div>
-        </>
+          </main>
+
+          <OrderTrackerPanel
+            order={selectedOrder}
+            onAdvance={advance}
+            onBill={setBillOrderId}
+            onCancel={cancel}
+            onKOT={sendKOT}
+            onBillPresented={presentBill}
+          />
+        </div>
       )}
 
       {view === 'kitchen' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {kitchenOrders.length === 0 && (
-            <div className="col-span-3 text-center py-12 text-gray-400">No active kitchen orders</div>
-          )}
-          {kitchenOrders.map((order) => (
-            <KOTCard
-              key={order._id}
-              order={order}
-              onAdvance={advance}
-              highlighted={highlightedOrderId === order._id}
-            />
-          ))}
+        <div>
+          <div className="mb-5 flex items-center justify-between">
+            <h2 className="text-xl font-extrabold text-gray-900">Kitchen Queue</h2>
+            <span className={`rounded-full px-3 py-1 text-xs font-bold ${connected ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
+            {connected ? '● Live' : '○ Offline'}
+          </span>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {kitchenOrders.length === 0 && (
+              <div className="col-span-full rounded-3xl border border-dashed border-orange-200 bg-white py-16 text-center text-gray-400 shadow-sm">
+                No active kitchen orders
+              </div>
+            )}
+            {kitchenOrders.map((order) => (
+              <KOTCard
+                key={order._id}
+                order={order}
+                onAdvance={advance}
+                highlighted={highlightedOrderId === order._id}
+              />
+            ))}
+          </div>
         </div>
       )}
 
