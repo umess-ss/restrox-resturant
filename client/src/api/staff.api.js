@@ -4,6 +4,7 @@ const base = '/staff';
 
 // Staff profiles
 export const fetchStaff = (params) => api.get(base, { params }).then((r) => r.data);
+export const createStaff = (data) => api.post(base, data).then((r) => r.data);
 export const fetchStaffMember = (id) => api.get(`${base}/${id}`).then((r) => r.data);
 export const updateStaff = (id, data) => api.put(`${base}/${id}`, data).then((r) => r.data);
 export const upsertProfile = (id, data) => api.put(`${base}/${id}/profile`, data).then((r) => r.data);

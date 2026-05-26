@@ -4,7 +4,7 @@ import { protect, can, authorize, selfOrAdmin } from '../../middlewares/auth.mid
 import { tenantContext } from '../../middlewares/tenant.middleware.js';
 import validate from '../../middlewares/validate.middleware.js';
 
-import { getStaff, getStaffMember, upsertProfile, updateStaff, deleteStaff } from './staff.controller.js';
+import { getStaff, getStaffMember, createStaff, upsertProfile, updateStaff, deleteStaff } from './staff.controller.js';
 import {
   myClockIn, myClockOut, myBreakStart, myBreakEnd,
   myToday, myAttendance,
@@ -24,6 +24,22 @@ router.use(protect, tenantContext);
 // ─── Staff profiles ───────────────────────────────────────────────────────────
 
 router.get('/', can('staff:read'), getStaff);
+router.post(
+  '/',
+  authorize('admin'),
+  [
+    body('name').trim().notEmpty().withMessage('Name is required'),
+    body('email').isEmail().withMessage('Valid email required'),
+    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+    body('role').isIn(['chef', 'waiter', 'cashier', 'manager', 'admin']).withMessage('Invalid role'),
+    body('department').optional().isIn(['kitchen', 'floor', 'bar', 'management', 'cleaning']),
+    body('salaryType').optional().isIn(['monthly', 'hourly']),
+    body('baseSalary').optional().isFloat({ min: 0 }),
+    body('branchId').optional().isMongoId(),
+  ],
+  validate,
+  createStaff
+);
 router.get('/:id', selfOrAdmin, getStaffMember);
 router.put('/:id', can('staff:write'), updateStaff);
 router.put('/:id/profile', can('staff:write'), upsertProfile);

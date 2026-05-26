@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import useAuthStore from '../store/authStore.js';
 import {
-  fetchStaff, fetchTeamToday, fetchWeeklySchedule,
+  fetchStaff, createStaff, fetchTeamToday, fetchWeeklySchedule,
   fetchPayrollList, runPayroll, approvePayroll, markPayrollPaid,
   clockIn, clockOut, startBreak, endBreak, fetchMyToday,
   createShift, calculatePayroll,
@@ -159,7 +159,7 @@ function ClockWidget() {
 
 // ─── Dashboard tab ────────────────────────────────────────────────────────────
 
-function StaffDashboard({ isManager }) {
+function StaffDashboard({ isManager, refreshKey }) {
   const [staff, setStaff] = useState([]);
   const [teamToday, setTeamToday] = useState([]);
   const [payroll, setPayroll] = useState([]);
@@ -177,7 +177,7 @@ function StaffDashboard({ isManager }) {
         setSelectedId(staffData[0]?.id || null);
       })
       .catch(() => toast.error('Failed to load staff dashboard'));
-  }, [isManager]);
+  }, [isManager, refreshKey]);
 
   const selected = staff.find((s) => s.id === selectedId) || staff[0];
   const active = staff.filter((s) => s.isActive).length;
@@ -282,7 +282,7 @@ function StaffDashboard({ isManager }) {
 
 // ─── Roster tab ───────────────────────────────────────────────────────────────
 
-function RosterTab() {
+function RosterTab({ refreshKey }) {
   const [staff, setStaff] = useState([]);
   const [teamToday, setTeamToday] = useState([]);
 
@@ -290,7 +290,7 @@ function RosterTab() {
     Promise.all([fetchStaff(), fetchTeamToday()])
       .then(([s, t]) => { setStaff(s); setTeamToday(t); })
       .catch(() => toast.error('Failed to load roster'));
-  }, []);
+  }, [refreshKey]);
 
   const attendanceMap = new Map(teamToday.map((r) => [r.user?._id, r]));
 
@@ -626,12 +626,131 @@ function PayrollTab() {
   );
 }
 
+function CreateStaffModal({ onClose, onCreated }) {
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'waiter',
+    department: 'floor',
+    salaryType: 'monthly',
+    baseSalary: '',
+    phone: '',
+    branchId: '',
+  });
+  const [loading, setLoading] = useState(false);
+
+  const set = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await createStaff({
+        ...form,
+        branchId: form.branchId || undefined,
+        baseSalary: Number(form.baseSalary || 0),
+      });
+      toast.success('Staff user created');
+      onCreated();
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not create staff user');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <form onSubmit={submit} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl">
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-extrabold text-gray-900">Create Staff User</h2>
+            <p className="mt-1 text-sm text-gray-400">Add a login for your own restaurant team.</p>
+          </div>
+          <button type="button" onClick={onClose} className="text-2xl text-gray-400 hover:text-gray-600">×</button>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-gray-400">Full name</label>
+            <input required value={form.name} onChange={(e) => set('name', e.target.value)}
+              className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-orange-300 focus:ring-4 focus:ring-orange-100" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-gray-400">Email</label>
+            <input required type="email" value={form.email} onChange={(e) => set('email', e.target.value)}
+              className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-orange-300 focus:ring-4 focus:ring-orange-100" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-gray-400">Temporary password</label>
+            <input required type="password" minLength={6} value={form.password} onChange={(e) => set('password', e.target.value)}
+              className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-orange-300 focus:ring-4 focus:ring-orange-100" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-gray-400">Phone</label>
+            <input value={form.phone} onChange={(e) => set('phone', e.target.value)}
+              className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-orange-300 focus:ring-4 focus:ring-orange-100" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-gray-400">Role</label>
+            <select value={form.role} onChange={(e) => set('role', e.target.value)}
+              className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm capitalize outline-none focus:border-orange-300 focus:ring-4 focus:ring-orange-100">
+              {['waiter', 'cashier', 'chef', 'manager', 'admin'].map((role) => (
+                <option key={role} value={role}>{role}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-gray-400">Department</label>
+            <select value={form.department} onChange={(e) => set('department', e.target.value)}
+              className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm capitalize outline-none focus:border-orange-300 focus:ring-4 focus:ring-orange-100">
+              {['floor', 'kitchen', 'bar', 'management', 'cleaning'].map((department) => (
+                <option key={department} value={department}>{department}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-gray-400">Salary type</label>
+            <select value={form.salaryType} onChange={(e) => set('salaryType', e.target.value)}
+              className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm capitalize outline-none focus:border-orange-300 focus:ring-4 focus:ring-orange-100">
+              <option value="monthly">monthly</option>
+              <option value="hourly">hourly</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-gray-400">Base salary</label>
+            <input type="number" min="0" step="0.01" value={form.baseSalary} onChange={(e) => set('baseSalary', e.target.value)}
+              className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-orange-300 focus:ring-4 focus:ring-orange-100" />
+          </div>
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-xs font-bold uppercase text-gray-400">Branch ID</label>
+            <input value={form.branchId} onChange={(e) => set('branchId', e.target.value)} placeholder="Optional if your admin account is assigned to a branch"
+              className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-orange-300 focus:ring-4 focus:ring-orange-100" />
+          </div>
+        </div>
+
+        <div className="mt-6 grid grid-cols-2 gap-3">
+          <button type="button" onClick={onClose} className="rounded-2xl border border-gray-200 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button disabled={loading} className="rounded-2xl bg-orange-500 py-3 text-sm font-bold text-white shadow-lg shadow-orange-200 hover:bg-orange-600 disabled:opacity-50">
+            {loading ? 'Creating...' : 'Create User'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function StaffPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [showCreate, setShowCreate] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const user = useAuthStore((s) => s.user);
   const isManager = ['admin', 'manager'].includes(user?.role);
+  const isAdmin = user?.role === 'admin';
   const requestedTab = searchParams.get('tab') || 'dashboard';
   const tab = !isManager && requestedTab === 'payroll' ? 'dashboard' : requestedTab;
   const setTab = (key) => setSearchParams({ tab: key });
@@ -652,15 +771,25 @@ export default function StaffPage() {
             {tab === 'payroll' ? 'Report and Analytics' : tab === 'roster' ? 'Our Employees' : tab === 'shifts' ? 'Attendance and Calendar' : 'Staff Dashboard'}
           </h1>
         </div>
-        <label className="relative block">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-orange-400">⌕</span>
-          <input
-            type="text"
-            placeholder="Search now"
-            className="h-12 w-full rounded-2xl border border-gray-200 bg-white pl-12 pr-4 text-sm outline-none focus:border-orange-300 focus:ring-4 focus:ring-orange-100 sm:w-80"
-            readOnly
-          />
-        </label>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <label className="relative block">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-orange-400">⌕</span>
+            <input
+              type="text"
+              placeholder="Search now"
+              className="h-12 w-full rounded-2xl border border-gray-200 bg-white pl-12 pr-4 text-sm outline-none focus:border-orange-300 focus:ring-4 focus:ring-orange-100 sm:w-80"
+              readOnly
+            />
+          </label>
+          {isAdmin && (
+            <button
+              onClick={() => setShowCreate(true)}
+              className="rounded-2xl bg-orange-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-orange-200 hover:bg-orange-600"
+            >
+              Create User
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="mb-6">
@@ -676,10 +805,16 @@ export default function StaffPage() {
         ))}
       </div>
 
-      {tab === 'dashboard' && <StaffDashboard isManager={isManager} />}
-      {tab === 'roster'  && <RosterTab />}
+      {tab === 'dashboard' && <StaffDashboard isManager={isManager} refreshKey={refreshKey} />}
+      {tab === 'roster'  && <RosterTab refreshKey={refreshKey} />}
       {tab === 'shifts'  && <ShiftsTab />}
       {tab === 'payroll' && isManager && <PayrollTab />}
+      {showCreate && (
+        <CreateStaffModal
+          onClose={() => setShowCreate(false)}
+          onCreated={() => setRefreshKey((key) => key + 1)}
+        />
+      )}
     </div>
   );
 }

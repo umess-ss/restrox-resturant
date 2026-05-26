@@ -5,12 +5,13 @@
 export const ROLES = Object.freeze({
   CHEF: 'chef',
   WAITER: 'waiter',
+  CASHIER: 'cashier',
   MANAGER: 'manager',
   ADMIN: 'admin',
 });
 
 // Ordered from least to most privileged
-const ROLE_HIERARCHY = [ROLES.CHEF, ROLES.WAITER, ROLES.MANAGER, ROLES.ADMIN];
+const ROLE_HIERARCHY = [ROLES.CHEF, ROLES.WAITER, ROLES.CASHIER, ROLES.MANAGER, ROLES.ADMIN];
 
 /**
  * Returns true if `userRole` meets or exceeds `requiredRole` in the hierarchy.
@@ -25,18 +26,18 @@ export const hasMinRole = (userRole, requiredRole) => {
  */
 export const PERMISSIONS = {
   // Menu
-  'menu:read':   [ROLES.CHEF, ROLES.WAITER, ROLES.MANAGER, ROLES.ADMIN],
+  'menu:read':   [ROLES.CHEF, ROLES.WAITER, ROLES.CASHIER, ROLES.MANAGER, ROLES.ADMIN],
   'menu:write':  [ROLES.MANAGER, ROLES.ADMIN],
   'menu:delete': [ROLES.ADMIN],
 
   // Orders
-  'orders:read':   [ROLES.CHEF, ROLES.WAITER, ROLES.MANAGER, ROLES.ADMIN],
-  'orders:write':  [ROLES.WAITER, ROLES.MANAGER, ROLES.ADMIN],
+  'orders:read':   [ROLES.CHEF, ROLES.WAITER, ROLES.CASHIER, ROLES.MANAGER, ROLES.ADMIN],
+  'orders:write':  [ROLES.WAITER, ROLES.CASHIER, ROLES.MANAGER, ROLES.ADMIN],
   'orders:delete': [ROLES.MANAGER, ROLES.ADMIN],
-  'orders:pay':    [ROLES.MANAGER, ROLES.ADMIN],
+  'orders:pay':    [ROLES.CASHIER, ROLES.MANAGER, ROLES.ADMIN],
 
   // Tables
-  'tables:read':   [ROLES.WAITER, ROLES.MANAGER, ROLES.ADMIN],
+  'tables:read':   [ROLES.WAITER, ROLES.CASHIER, ROLES.MANAGER, ROLES.ADMIN],
   'tables:write':  [ROLES.MANAGER, ROLES.ADMIN],
   'tables:delete': [ROLES.ADMIN],
 
