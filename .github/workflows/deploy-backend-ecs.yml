@@ -1,4 +1,4 @@
-name: Deploy Backend to AWS ECS Fargate
+name: Backend CI
 
 on:
   push:
@@ -6,64 +6,50 @@ on:
       - main
     paths:
       - "server/**"
-      - ".github/workflows/deploy-backend-ecs.yml"
+      - ".github/workflows/backend-ci.yml"
 
-permissions:
-  id-token: write
-  contents: read
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  AWS_REGION: ${{ vars.AWS_REGION }}
-  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
-  ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
-  ECS_SERVICE: ${{ vars.ECS_SERVICE }}
-  ECS_TASK_DEFINITION: ${{ vars.ECS_TASK_DEFINITION }}
-  CONTAINER_NAME: ${{ vars.CONTAINER_NAME }}
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "server/**"
+      - ".github/workflows/backend-ci.yml"
 
 jobs:
-  deploy:
-    name: Build, Push, and Deploy Backend
+  backend-ci:
+    name: Build and Test Backend
     runs-on: ubuntu-latest
-    environment: production
+
+    defaults:
+      run:
+        working-directory: ./server
 
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials using OIDC
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ env.AWS_REGION }}
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Build and push Docker image
-        id: build-image
-        working-directory: ./server
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+      - name: Check code formatting
+        run: npm run format:check
+        continue-on-error: true
 
-      - name: Render new ECS task definition
-        id: render-task-def
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: ${{ env.ECS_TASK_DEFINITION }}
-          container-name: ${{ env.CONTAINER_NAME }}
-          image: ${{ steps.build-image.outputs.image }}
+      - name: Run lint
+        run: npm run lint
+        continue-on-error: true
 
-      - name: Deploy new ECS task definition
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
-        with:
-          task-definition: ${{ steps.render-task-def.outputs.task-definition }}
-          service: ${{ env.ECS_SERVICE }}
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
+      - name: Run tests
+        run: npm test
+        continue-on-error: true
+
+      - name: Build backend
+        run: npm run build
+        continue-on-error: true

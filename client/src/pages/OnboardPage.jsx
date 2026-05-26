@@ -33,7 +33,7 @@ export default function OnboardPage() {
       // Auto-login after onboarding
       await login(form.ownerEmail, form.ownerPassword);
       toast.success(`Welcome to ${form.restaurantName}!`);
-      navigate('/');
+      navigate('/dashboard');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Registration failed');
     } finally {

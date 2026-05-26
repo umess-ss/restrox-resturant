@@ -11,6 +11,7 @@ import InventoryPage from './pages/InventoryPage.jsx';
 import POSPage from './pages/POSPage.jsx';
 import KDSPage from './pages/KDSPage.jsx';
 import OnboardPage from './pages/OnboardPage.jsx';
+import LandingPage from './pages/LandingPage.jsx';
 import CustomerTablePage from './pages/customer/CustomerTablePage.jsx';
 import CustomerOrderStatusPage from './pages/customer/CustomerOrderStatusPage.jsx';
 
@@ -22,6 +23,8 @@ const PrivateRoute = ({ children }) => {
 export default function App() {
   return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
+
       {/* ─── Public customer QR routes — no auth, no layout ─── */}
       <Route
         path="/customer/:restaurantId/:branchId/table/:tableId"
@@ -43,7 +46,7 @@ export default function App() {
           </PrivateRoute>
         }
       >
-        <Route index element={<DashboardPage />} />
+        <Route path="dashboard" element={<DashboardPage />} />
         <Route path="menu" element={<MenuPage />} />
         <Route path="orders" element={<OrdersPage />} />
         <Route path="tables" element={<TablesPage />} />
