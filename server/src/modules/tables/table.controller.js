@@ -26,14 +26,23 @@ export const createTable = async (req, res) => {
 };
 
 export const updateTable = async (req, res) => {
-  const table = await Table.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+  const table = await Table.findOneAndUpdate(
+    { _id: req.params.id, ...req.branchFilter },
+    req.body,
+    { new: true, runValidators: true }
+  );
   if (!table) return res.status(404).json({ message: 'Table not found' });
   res.json(table);
 };
 
 export const deleteTable = async (req, res) => {
-  const table = await Table.findByIdAndDelete(req.params.id);
+  const table = await Table.findOne({ _id: req.params.id, ...req.branchFilter });
   if (!table) return res.status(404).json({ message: 'Table not found' });
+  if (table.currentOrder || table.status === 'occupied') {
+    return res.status(409).json({ message: 'Cannot delete a table with an active order' });
+  }
+
+  await table.deleteOne();
   res.status(204).send();
 };
 

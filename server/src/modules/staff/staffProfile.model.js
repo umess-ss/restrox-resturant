@@ -89,6 +89,9 @@ staffProfileSchema.pre('save', async function (next) {
 // Staff profiles are branch-scoped
 staffProfileSchema.add(tenantFields(true));
 addTenantIndexes(staffProfileSchema, true);
-staffProfileSchema.index({ restaurant: 1, employeeId: 1 }, { unique: true, sparse: true });
+staffProfileSchema.index(
+  { restaurant: 1, employeeId: 1 },
+  { unique: true, partialFilterExpression: { employeeId: { $type: 'string' } } }
+);
 
 export default mongoose.model('StaffProfile', staffProfileSchema);

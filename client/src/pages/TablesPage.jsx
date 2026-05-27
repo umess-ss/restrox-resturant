@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
-import { fetchTables, createTable, updateTable, fetchTableQR } from '../api/tables.api.js';
+import { fetchTables, createTable, updateTable, deleteTable, fetchTableQR } from '../api/tables.api.js';
 import formatCurrency from '../utils/formatCurrency.js';
 
 const STATUS_STYLES = {
@@ -12,6 +12,7 @@ const STATUS_STYLES = {
 };
 
 const LOCATION_ICONS = { indoor: '🏠', outdoor: '🌿', bar: '🍸' };
+const tableDisplayId = (table) => table.tableId || `TABLE-${String(table.number || 0).padStart(4, '0')}`;
 
 // ─── QR Modal ─────────────────────────────────────────────────────────────────
 
@@ -126,7 +127,7 @@ function AddTableModal({ onClose, onCreated }) {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-bold text-gray-800 text-lg">Add Table</h3>
-            <p className="text-sm text-gray-500 mt-0.5">Create a new dining table for this branch.</p>
+            <p className="text-sm text-gray-500 mt-0.5">Table ID is generated automatically, like TABLE-0001.</p>
           </div>
           <button
             onClick={onClose}
@@ -259,6 +260,24 @@ export default function TablesPage() {
     }
   };
 
+  const removeTable = async (table) => {
+    if (table.currentOrder || table.status === 'occupied') {
+      toast.error('Cannot delete a table with an active order');
+      return;
+    }
+
+    const label = tableDisplayId(table);
+    if (!confirm(`Delete ${label}?`)) return;
+
+    try {
+      await deleteTable(table._id);
+      toast.success(`${label} deleted`);
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete table');
+    }
+  };
+
   const stats = {
     available: tables.filter((t) => t.status === 'available').length,
     occupied:  tables.filter((t) => t.status === 'occupied').length,
@@ -315,8 +334,21 @@ export default function TablesPage() {
             >
               {/* Table number + location */}
               <div className="flex justify-between items-start">
-                <span className="text-2xl font-bold text-gray-800">{table.number}</span>
-                <span className="text-lg">{LOCATION_ICONS[table.location]}</span>
+                <div>
+                  <span className="text-2xl font-bold text-gray-800">{table.number}</span>
+                  <p className="text-[11px] font-bold text-gray-400">{tableDisplayId(table)}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{LOCATION_ICONS[table.location]}</span>
+                  <button
+                    onClick={() => removeTable(table)}
+                    disabled={table.status === 'occupied' || !!table.currentOrder}
+                    title={table.status === 'occupied' || table.currentOrder ? 'Cannot delete a table with an active order' : 'Delete table'}
+                    className="rounded-md bg-white/80 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-white/80"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
 
               <div>

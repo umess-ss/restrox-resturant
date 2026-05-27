@@ -8,3 +8,4 @@ export const fetchTableOrder = (id) => api.get(`${base}/${id}/order`).then((r) =
 export const fetchTableQR = (id) => api.get(`${base}/${id}/qr`).then((r) => r.data);
 export const createTable = (data) => api.post(base, data).then((r) => r.data);
 export const updateTable = (id, data) => api.put(`${base}/${id}`, data).then((r) => r.data);
+export const deleteTable = (id) => api.delete(`${base}/${id}`);
