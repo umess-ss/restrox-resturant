@@ -228,21 +228,21 @@ export default function CustomerTablePage() {
   }
 
   return (
-    <div className="min-h-screen overflow-x-auto bg-[#e9e9f1] px-8 py-8 text-gray-950">
-      <div className="mx-auto min-w-[1120px] max-w-[1440px] rounded-[2rem] bg-white/80 p-5 shadow-2xl shadow-gray-300/70 ring-1 ring-white">
-        <header className="mb-4 flex h-16 items-center gap-5 rounded-[1.5rem] bg-white px-5 shadow-sm">
-          <div className="mr-3 text-xl font-black tracking-tight text-red-600">
+    <div className="min-h-screen bg-[#e9e9f1] px-3 py-3 text-gray-950 sm:px-5 sm:py-5 lg:px-8 lg:py-8">
+      <div className="mx-auto w-full max-w-[1440px] rounded-[1.25rem] bg-white/80 p-3 shadow-2xl shadow-gray-300/70 ring-1 ring-white sm:rounded-[2rem] sm:p-5">
+        <header className="mb-4 flex flex-wrap items-center gap-3 rounded-[1.25rem] bg-white px-3 py-3 shadow-sm sm:rounded-[1.5rem] sm:px-5 lg:flex-nowrap">
+          <div className="mr-auto min-w-0 text-lg font-black tracking-tight text-red-600 sm:mr-3 sm:text-xl">
             {tableInfo?.restaurant?.name || 'RestroX'}
           </div>
 
-          <nav className="flex flex-1 items-center gap-2 overflow-hidden">
+          <nav className="order-3 flex w-full items-center gap-2 overflow-x-auto pb-1 lg:order-none lg:w-auto lg:flex-1">
             {categories.map((cat) => {
               const meta = CAT_META[cat] || { icon: '🍴', label: cat };
               return (
                 <button
                   key={cat}
                   onClick={() => { setActiveCategory(cat); setSearch(''); }}
-                  className={`flex h-10 shrink-0 items-center gap-2 rounded-full px-4 text-sm font-bold capitalize transition ${
+                  className={`flex h-10 shrink-0 items-center gap-2 rounded-full px-3 text-xs font-bold capitalize transition sm:px-4 sm:text-sm ${
                     activeCategory === cat && !search
                       ? 'bg-red-50 text-red-600'
                       : 'text-gray-600 hover:bg-gray-50 hover:text-gray-950'
@@ -255,7 +255,7 @@ export default function CustomerTablePage() {
             })}
           </nav>
 
-          <label className="relative w-72">
+          <label className="relative order-4 w-full sm:order-none sm:w-72">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">⌕</span>
             <input
               value={search}
@@ -265,31 +265,31 @@ export default function CustomerTablePage() {
             />
           </label>
 
-          <div className="rounded-full bg-red-600 px-5 py-3 text-sm font-extrabold text-white">
+          <div className="shrink-0 rounded-full bg-red-600 px-4 py-3 text-xs font-extrabold text-white sm:px-5 sm:text-sm">
             {isAppendMode ? 'Add More' : 'Cart'} {cartCount}
           </div>
         </header>
 
-        <div className="grid grid-cols-[1fr_360px] gap-4">
-          <main className="min-h-[720px] rounded-[1.5rem] bg-[#fbfbfc] p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <main className="min-h-[520px] rounded-[1.25rem] bg-[#fbfbfc] p-3 shadow-sm sm:rounded-[1.5rem] sm:p-5">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs font-black uppercase tracking-wide text-red-600">Meal Category</p>
-                <h1 className="mt-1 text-2xl font-black capitalize text-gray-950">
+                <h1 className="mt-1 text-2xl font-black capitalize text-gray-950 sm:text-3xl lg:text-2xl">
                   {search ? 'Search Results' : (CAT_META[activeCategory]?.label || activeCategory || 'Menu')}
                 </h1>
               </div>
-              <p className="rounded-full bg-white px-4 py-2 text-sm font-bold text-gray-500 shadow-sm">
+              <p className="w-fit rounded-full bg-white px-4 py-2 text-sm font-bold text-gray-500 shadow-sm">
                 {tableInfo?.branch?.name} · Table {tableInfo?.table?.number}
               </p>
             </div>
 
-            <div className="mb-5 flex gap-2 overflow-hidden">
+            <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
               {categories.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => { setActiveCategory(cat); setSearch(''); }}
-                  className={`rounded-full px-4 py-2 text-xs font-bold capitalize transition ${
+                  className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold capitalize transition ${
                     activeCategory === cat && !search ? 'bg-black text-white' : 'bg-white text-gray-600 hover:bg-gray-100'
                   }`}
                 >
@@ -299,24 +299,24 @@ export default function CustomerTablePage() {
             </div>
 
             {featured ? (
-              <section className="grid grid-cols-[46%_1fr] gap-8 rounded-[1.5rem] bg-white p-6 shadow-sm">
-                <div className="relative flex min-h-[360px] items-center justify-center overflow-hidden rounded-[1.25rem] bg-red-50">
-                  <div className="absolute inset-10 rounded-full bg-red-100" />
-                  <DishImage item={featured} className="relative h-80 w-80 rounded-full shadow-2xl shadow-red-100" />
+              <section className="grid gap-5 rounded-[1.25rem] bg-white p-4 shadow-sm lg:grid-cols-[42%_1fr] lg:gap-8 lg:p-6">
+                <div className="relative flex aspect-[4/3] min-h-[220px] items-center justify-center overflow-hidden rounded-[1.25rem] bg-red-50 sm:min-h-[300px] lg:min-h-[360px]">
+                  <div className="absolute inset-6 rounded-full bg-red-100 sm:inset-10" />
+                  <DishImage item={featured} className="relative h-56 w-56 rounded-full shadow-2xl shadow-red-100 sm:h-72 sm:w-72 lg:h-80 lg:w-80" />
                 </div>
 
                 <div className="flex flex-col justify-center">
                   <p className="mb-2 text-xs font-black uppercase tracking-wide text-gray-400">
                     {featured.category || 'Featured'}
                   </p>
-                  <h2 className="max-w-lg text-5xl font-black leading-tight tracking-tight text-gray-950">
+                  <h2 className="max-w-lg text-3xl font-black leading-tight tracking-tight text-gray-950 sm:text-4xl lg:text-5xl">
                     {featured.name}
                   </h2>
                   <p className="mt-4 max-w-md text-sm leading-6 text-gray-500">
                     {featured.description || 'Freshly prepared by the kitchen and ready to add to your table order.'}
                   </p>
 
-                  <div className="mt-7 flex items-center gap-3">
+                  <div className="mt-7 flex flex-wrap items-center gap-3">
                     <span className="rounded-full bg-gray-100 px-4 py-2 text-xs font-bold text-gray-500">
                       {featured.preparationTime || 15} min
                     </span>
@@ -328,7 +328,7 @@ export default function CustomerTablePage() {
                     </span>
                   </div>
 
-                  <div className="mt-8 flex items-center gap-5">
+                  <div className="mt-8 flex flex-wrap items-center gap-5">
                     <span className="text-xl font-black text-red-600">{formatCurrency(featured.price)}</span>
                     <QtyControl
                       qty={cartQty(featured._id)}
@@ -347,14 +347,14 @@ export default function CustomerTablePage() {
 
             {recommended.length > 0 && (
               <section className="mt-5">
-                <div className="mb-3 flex items-center justify-between">
+                <div className="mb-3 flex items-center justify-between gap-3">
                   <h3 className="text-sm font-black uppercase tracking-wide text-gray-500">Recommended Pairings</h3>
                   <span className="text-xs font-bold text-gray-400">{recommended.length} items</span>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                   {recommended.map((item, index) => (
                     <div key={item._id} className="flex items-center gap-3 rounded-2xl border border-dashed border-gray-200 bg-white p-3">
-                      <DishImage item={item} index={index + 1} className="h-20 w-20 rounded-full" />
+                      <DishImage item={item} index={index + 1} className="h-16 w-16 rounded-full sm:h-20 sm:w-20" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-black text-gray-950">{item.name}</p>
                         <p className="mt-1 text-xs font-bold text-red-600">{formatCurrency(item.price)}</p>
@@ -375,10 +375,10 @@ export default function CustomerTablePage() {
             {supportingItems.length > 0 && (
               <section className="mt-5">
                 <h3 className="mb-3 text-sm font-black uppercase tracking-wide text-gray-500">More Dishes</h3>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-3 lg:grid-cols-2">
                   {supportingItems.slice(0, 8).map((item, index) => (
                     <div key={item._id} className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm">
-                      <DishImage item={item} index={index + 2} className="h-20 w-20 rounded-2xl" />
+                      <DishImage item={item} index={index + 2} className="h-16 w-16 rounded-2xl sm:h-20 sm:w-20" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-black text-gray-950">{item.name}</p>
                         <p className="line-clamp-1 text-xs text-gray-400">{item.description || item.category}</p>
@@ -398,13 +398,13 @@ export default function CustomerTablePage() {
             )}
           </main>
 
-          <aside className="rounded-[1.5rem] bg-[#fbfbfc] p-5 shadow-sm">
+          <aside className="rounded-[1.25rem] bg-[#fbfbfc] p-4 shadow-sm sm:rounded-[1.5rem] sm:p-5 xl:sticky xl:top-5 xl:self-start">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-black text-gray-950">My Order</h2>
               <span className="text-sm font-semibold text-gray-400">{cart.length} positions</span>
             </div>
 
-            <div className="max-h-[330px] space-y-3 overflow-y-auto pr-1">
+            <div className="max-h-[45vh] space-y-3 overflow-y-auto pr-1 xl:max-h-[330px]">
               {cart.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-6 text-center text-sm font-semibold text-gray-400">
                   Add dishes to start your order.
