@@ -58,7 +58,7 @@ export const getMenuItem = async (req, res) => {
 export const createMenuItem = async (req, res) => {
   const { recipe: recipeIngredients, ...itemData } = req.body;
   const { item, recipe } = await createMenuItemWithRecipe(
-    normalizeMenuItemData(itemData),
+    normalizeMenuItemData({ ...itemData, restaurant: req.restaurantId }),
     recipeIngredients,
     req.user._id
   );
@@ -68,10 +68,11 @@ export const createMenuItem = async (req, res) => {
 export const updateMenuItem = async (req, res) => {
   const { recipe: recipeIngredients, ...itemData } = req.body;
 
-  const item = await MenuItem.findByIdAndUpdate(req.params.id, normalizeMenuItemData(itemData), {
-    new: true,
-    runValidators: true,
-  });
+  const item = await MenuItem.findOneAndUpdate(
+    { _id: req.params.id, ...req.tenantFilter },
+    normalizeMenuItemData(itemData),
+    { new: true, runValidators: true }
+  );
   if (!item) return res.status(404).json({ message: 'Menu item not found' });
 
   // If recipe ingredients were included, update them too
@@ -87,10 +88,10 @@ export const updateMenuItem = async (req, res) => {
 };
 
 export const deleteMenuItem = async (req, res) => {
-  const item = await MenuItem.findByIdAndDelete(req.params.id);
+  const item = await MenuItem.findOneAndDelete({ _id: req.params.id, ...req.tenantFilter });
   if (!item) return res.status(404).json({ message: 'Menu item not found' });
   // Soft-deactivate the recipe too
-  await Recipe.findOneAndUpdate({ menuItem: req.params.id }, { isActive: false });
+  await Recipe.findOneAndUpdate({ menuItem: req.params.id, ...req.tenantFilter }, { isActive: false });
   res.status(204).send();
 };
 

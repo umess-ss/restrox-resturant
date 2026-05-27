@@ -66,6 +66,38 @@ function MarginBadge({ pct }) {
   return <span className={`text-xs font-semibold ${color}`}>{pct.toFixed(1)}%</span>;
 }
 
+function ItemActionsMenu({ item, isOpen, onToggle, onEdit, onDelete }) {
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="rounded-full px-2 text-xl leading-none text-gray-400 hover:bg-orange-50 hover:text-orange-500"
+        aria-label={`Actions for ${item.name}`}
+        aria-expanded={isOpen}
+      >•••</button>
+      {isOpen && (
+        <div className="absolute right-0 top-8 z-30 w-32 overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-xl shadow-gray-200">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="block w-full px-4 py-2 text-left text-sm font-semibold text-gray-700 hover:bg-orange-50 hover:text-orange-600"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="block w-full px-4 py-2 text-left text-sm font-semibold text-red-600 hover:bg-red-50"
+          >
+            Delete
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Recipe Editor ────────────────────────────────────────────────────────────
 
 function RecipeEditor({ item, ingredients, onClose, onSaved }) {
@@ -423,6 +455,7 @@ export default function MenuPage() {
   const [itemModal, setItemModal] = useState(null);   // null | 'new' | item object
   const [recipeModal, setRecipeModal] = useState(null); // null | item object
   const [showMargins, setShowMargins] = useState(false);
+  const [openActionsId, setOpenActionsId] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -439,14 +472,15 @@ export default function MenuPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleDelete = async (id) => {
-    if (!confirm('Delete this menu item?')) return;
+  const handleDelete = async (item) => {
+    if (!confirm(`Delete "${item.name}"?`)) return;
     try {
-      await deleteMenuItem(id);
+      await deleteMenuItem(item._id);
       toast.success('Item deleted');
+      setOpenActionsId(null);
       load();
-    } catch {
-      toast.error('Delete failed');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Delete failed');
     }
   };
 
@@ -564,11 +598,13 @@ export default function MenuPage() {
                           <span className="text-orange-500">{formatCurrency(item.price).slice(0, 1)}</span>{formatCurrency(item.price).slice(1)}
                         </p>
                       </div>
-                      <button
-                        onClick={() => setItemModal(item)}
-                        className="rounded-full px-2 text-xl leading-none text-gray-400 hover:bg-orange-50 hover:text-orange-500"
-                        aria-label={`Edit ${item.name}`}
-                      >•••</button>
+                      <ItemActionsMenu
+                        item={item}
+                        isOpen={openActionsId === `popular-${item._id}`}
+                        onToggle={() => setOpenActionsId((id) => id === `popular-${item._id}` ? null : `popular-${item._id}`)}
+                        onEdit={() => { setItemModal(item); setOpenActionsId(null); }}
+                        onDelete={() => handleDelete(item)}
+                      />
                     </div>
                     <p className="mt-2 text-xs text-gray-400">★ 5.0 · {item.preparationTime} min prep</p>
                   </div>
@@ -592,11 +628,15 @@ export default function MenuPage() {
           {displayed.map((item) => (
             <article key={item._id} className="group overflow-hidden rounded-2xl bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl hover:shadow-orange-100">
               <div className="relative p-5 pb-0">
-                <button
-                  onClick={() => setItemModal(item)}
-                  className="absolute right-4 top-4 z-10 rounded-full px-2 text-xl leading-none text-gray-400 hover:bg-orange-50 hover:text-orange-500"
-                  aria-label={`Edit ${item.name}`}
-                >•••</button>
+                <div className="absolute right-4 top-4 z-10">
+                  <ItemActionsMenu
+                    item={item}
+                    isOpen={openActionsId === item._id}
+                    onToggle={() => setOpenActionsId((id) => id === item._id ? null : item._id)}
+                    onEdit={() => { setItemModal(item); setOpenActionsId(null); }}
+                    onDelete={() => handleDelete(item)}
+                  />
+                </div>
                 <MenuImage
                   src={itemImageUrl(item)}
                   alt={item.name}
@@ -647,16 +687,6 @@ export default function MenuPage() {
                   >{item.recipe ? 'Edit recipe' : 'Add recipe'}</button>
                 </div>
 
-                <div className="grid grid-cols-[1fr_auto] gap-2">
-                  <button
-                    onClick={() => setItemModal(item)}
-                    className="rounded-xl border border-gray-200 py-2 text-xs font-bold text-gray-600 transition hover:bg-gray-50"
-                  >Edit</button>
-                  <button
-                    onClick={() => handleDelete(item._id)}
-                    className="rounded-xl border border-red-200 px-4 py-2 text-xs font-bold text-red-500 transition hover:bg-red-50"
-                  >Delete</button>
-                </div>
               </div>
             </article>
           ))}

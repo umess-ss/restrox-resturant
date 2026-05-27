@@ -80,7 +80,7 @@ export const createMenuItemWithRecipe = async (itemData, ingredients, userId) =>
     let recipe = null;
     if (ingredients?.length) {
       [recipe] = await Recipe.create(
-        [{ menuItem: item._id, ingredients, isActive: true }],
+        [{ menuItem: item._id, restaurant: item.restaurant, ingredients, isActive: true }],
         { session }
       );
     }
