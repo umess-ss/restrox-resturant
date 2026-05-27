@@ -206,10 +206,11 @@ function StaffDashboard({ isManager, refreshKey }) {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-sm">
+            <table className="w-full min-w-[860px] text-sm">
               <thead className="border-b border-gray-100 text-xs text-gray-400">
                 <tr>
                   <th className="py-3 text-left">Employee Name</th>
+                  <th className="py-3 text-left">Batch ID</th>
                   <th className="py-3 text-left">Position</th>
                   <th className="py-3 text-left">Department</th>
                   <th className="py-3 text-left">Salary</th>
@@ -232,6 +233,7 @@ function StaffDashboard({ isManager, refreshKey }) {
                         </div>
                       </div>
                     </td>
+                    <td className="py-3 font-mono text-xs font-bold text-gray-600">{s.profile?.employeeId || '—'}</td>
                     <td className="py-3 capitalize text-gray-600">{s.role}</td>
                     <td className="py-3 capitalize text-gray-600">{s.profile?.department || 'General'}</td>
                     <td className="py-3 font-bold text-gray-900">{s.profile?.baseSalary ? money(s.profile.baseSalary) : '—'}</td>
@@ -257,6 +259,7 @@ function StaffDashboard({ isManager, refreshKey }) {
                 <p className="text-sm capitalize text-gray-400">{selected.role}</p>
                 <div className="mt-6 space-y-3 text-sm">
                   {[
+                    ['Batch ID', selected.profile?.employeeId || '—'],
                     ['Position', selected.role],
                     ['Department', selected.profile?.department || 'General'],
                     ['Joining Date', selected.profile?.hireDate ? new Date(selected.profile.hireDate).toLocaleDateString() : '—'],
@@ -295,11 +298,12 @@ function RosterTab({ refreshKey }) {
   const attendanceMap = new Map(teamToday.map((r) => [r.user?._id, r]));
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-      <table className="w-full text-sm">
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
+      <table className="w-full min-w-[860px] text-sm">
         <thead className="bg-gray-50 text-gray-500 uppercase text-xs">
           <tr>
             <th className="px-4 py-3 text-left">Name</th>
+            <th className="px-4 py-3 text-left">Batch ID</th>
             <th className="px-4 py-3 text-left">Role</th>
             <th className="px-4 py-3 text-left">Department</th>
             <th className="px-4 py-3 text-left">Salary</th>
@@ -315,8 +319,8 @@ function RosterTab({ refreshKey }) {
                 <td className="px-4 py-3">
                   <p className="font-medium text-gray-800">{s.name}</p>
                   <p className="text-xs text-gray-400">{s.email}</p>
-                  {s.profile?.employeeId && <p className="text-xs text-gray-400">{s.profile.employeeId}</p>}
                 </td>
+                <td className="px-4 py-3 font-mono text-xs font-bold text-gray-600">{s.profile?.employeeId || '—'}</td>
                 <td className="px-4 py-3">
                   <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${ROLE_COLORS[s.role]}`}>{s.role}</span>
                 </td>
@@ -636,7 +640,6 @@ function CreateStaffModal({ onClose, onCreated }) {
     salaryType: 'monthly',
     baseSalary: '',
     phone: '',
-    branchId: '',
   });
   const [loading, setLoading] = useState(false);
 
@@ -648,14 +651,14 @@ function CreateStaffModal({ onClose, onCreated }) {
     try {
       await createStaff({
         ...form,
-        branchId: form.branchId || undefined,
         baseSalary: Number(form.baseSalary || 0),
       });
       toast.success('Staff user created');
       onCreated();
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Could not create staff user');
+      const message = err.response?.data?.message || err.response?.data?.errors?.[0]?.msg || 'Could not create staff user';
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -724,10 +727,9 @@ function CreateStaffModal({ onClose, onCreated }) {
             <input type="number" min="0" step="0.01" value={form.baseSalary} onChange={(e) => set('baseSalary', e.target.value)}
               className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-orange-300 focus:ring-4 focus:ring-orange-100" />
           </div>
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-xs font-bold uppercase text-gray-400">Branch ID</label>
-            <input value={form.branchId} onChange={(e) => set('branchId', e.target.value)} placeholder="Optional if your admin account is assigned to a branch"
-              className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-orange-300 focus:ring-4 focus:ring-orange-100" />
+          <div className="md:col-span-2 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3">
+            <p className="text-xs font-bold uppercase text-orange-500">Batch ID</p>
+            <p className="mt-1 text-sm font-semibold text-gray-700">Generated automatically as STF-YYYY-0001</p>
           </div>
         </div>
 

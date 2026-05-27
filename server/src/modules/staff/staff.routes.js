@@ -35,7 +35,7 @@ router.post(
     body('department').optional().isIn(['kitchen', 'floor', 'bar', 'management', 'cleaning']),
     body('salaryType').optional().isIn(['monthly', 'hourly']),
     body('baseSalary').optional().isFloat({ min: 0 }),
-    body('branchId').optional().isMongoId(),
+    body('branchId').optional().isMongoId().withMessage('Branch ID must be a valid branch ObjectId'),
   ],
   validate,
   createStaff

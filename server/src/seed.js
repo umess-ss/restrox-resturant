@@ -63,7 +63,7 @@ const USERS = [
   { name: 'Alex Waiter',   email: 'waiter@rms.com',   password: 'waiter123',   role: 'waiter'  },
   { name: 'Lisa Waiter',   email: 'waiter2@rms.com',  password: 'waiter123',   role: 'waiter'  },
 ];
-h
+
 const userMap = {};
 for (const u of USERS) {
   let user = await User.findOne({ email: u.email });
@@ -107,7 +107,12 @@ for (const p of PROFILES) {
   const user = userMap[p.email];
   const exists = await StaffProfile.findOne({ user: user._id });
   if (!exists) {
-    await StaffProfile.create({ user: user._id, ...p });
+    await StaffProfile.create({
+      user: user._id,
+      restaurant: restaurant._id,
+      branch: branch._id,
+      ...p,
+    });
     logger.info(`Created profile: ${p.email}`);
   }
 }

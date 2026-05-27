@@ -46,6 +46,7 @@ export const getStaffMember = async (req, res, next) => {
 };
 
 export const createStaff = async (req, res, next) => {
+  let createdUser = null;
   try {
     const {
       name,
@@ -66,8 +67,22 @@ export const createStaff = async (req, res, next) => {
     const exists = await User.findOne({ email });
     if (exists) return res.status(409).json({ message: 'Email already in use' });
 
-    const branch = branchId || req.branchId;
-    if (!branch) return res.status(400).json({ message: 'Branch is required to create staff' });
+    if (!req.restaurantId) {
+      return res.status(400).json({ message: 'Restaurant context is required to create staff' });
+    }
+
+    let branch = branchId || req.branchId;
+    if (!branch) {
+      const defaultBranch = await Branch.findOne({
+        restaurant: req.restaurantId,
+        isActive: true,
+      }).sort({ isHeadquarters: -1, createdAt: 1 });
+
+      if (!defaultBranch) {
+        return res.status(400).json({ message: 'Create an active branch before adding staff' });
+      }
+      branch = defaultBranch._id;
+    }
 
     const branchDoc = await Branch.findOne({ _id: branch, restaurant: req.restaurantId, isActive: true });
     if (!branchDoc) return res.status(404).json({ message: 'Branch not found for this restaurant' });
@@ -78,7 +93,7 @@ export const createStaff = async (req, res, next) => {
       return res.status(400).json({ message: 'Base salary cannot be negative' });
     }
 
-    const user = await User.create({
+    createdUser = await User.create({
       name,
       email,
       password,
@@ -88,7 +103,7 @@ export const createStaff = async (req, res, next) => {
     });
 
     const profile = await StaffProfile.create({
-      user: user._id,
+      user: createdUser._id,
       restaurant: req.restaurantId,
       branch,
       department,
@@ -97,12 +112,9 @@ export const createStaff = async (req, res, next) => {
       phone,
     });
 
-    res.status(201).json({ ...user.toPublic(), profile });
+    res.status(201).json({ ...createdUser.toPublic(), profile });
   } catch (error) {
-    // If StaffProfile creation failed, clean up the created User
-    if (error.message && error.message.includes('profile') && req.body.email) {
-      await User.findOneAndDelete({ email: req.body.email }).catch(() => {});
-    }
+    if (createdUser) await User.findByIdAndDelete(createdUser._id).catch(() => {});
     next(error);
   }
 };

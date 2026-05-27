@@ -37,7 +37,7 @@ const staffProfileSchema = new mongoose.Schema(
     },
 
     // Employment
-    employeeId: { type: String, unique: true, sparse: true }, // e.g. EMP-0001
+    employeeId: { type: String, sparse: true }, // e.g. STF-2026-0001
     department: {
       type: String,
       enum: ['kitchen', 'floor', 'bar', 'management', 'cleaning'],
@@ -68,18 +68,27 @@ const staffProfileSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Auto-generate employeeId on first save
+// Auto-generate a restaurant-scoped staff batch ID on first save.
 staffProfileSchema.pre('save', async function (next) {
-  if (this.isNew && !this.employeeId) {
-    // Scope employee ID to restaurant
-    const count = await mongoose.model('StaffProfile').countDocuments({ restaurant: this.restaurant });
-    this.employeeId = `EMP-${String(count + 1).padStart(4, '0')}`;
-  }
+  if (!this.isNew || this.employeeId) return next();
+
+  const year = new Date().getFullYear();
+  const prefix = `STF-${year}-`;
+  const latest = await mongoose
+    .model('StaffProfile')
+    .findOne({ restaurant: this.restaurant, employeeId: new RegExp(`^${prefix}`) })
+    .sort({ employeeId: -1 })
+    .select('employeeId')
+    .lean();
+
+  const latestNumber = Number(latest?.employeeId?.slice(prefix.length)) || 0;
+  this.employeeId = `${prefix}${String(latestNumber + 1).padStart(4, '0')}`;
   next();
 });
 
 // Staff profiles are branch-scoped
 staffProfileSchema.add(tenantFields(true));
 addTenantIndexes(staffProfileSchema, true);
+staffProfileSchema.index({ restaurant: 1, employeeId: 1 }, { unique: true, sparse: true });
 
 export default mongoose.model('StaffProfile', staffProfileSchema);

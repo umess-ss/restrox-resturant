@@ -8,6 +8,7 @@
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "lint": "eslint src/**/*.js",
+    "seed": "node src/seed.js",
     "seed:menu-images": "node src/scripts/seedMenuImages.js"
   },
   "dependencies": {
