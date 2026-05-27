@@ -124,7 +124,7 @@ export const resolveTable = async (restaurantId, branchId, tableId) => {
 export const getPublicMenu = async (restaurantId, _branchId) => {
   assertObjectId(restaurantId, 'restaurantId');
 
-  const items = await MenuItem.find({
+  let items = await MenuItem.find({
     $or: [
       { restaurant: restaurantId },
       { restaurant: { $exists: false } },
@@ -135,6 +135,17 @@ export const getPublicMenu = async (restaurantId, _branchId) => {
     .select('name description price category imageUrl tags allergens preparationTime isAvailable')
     .sort('category name')
     .lean();
+
+  // Local/demo databases may contain menu items seeded under a different
+  // restaurant because the legacy admin menu endpoint used to be unscoped.
+  // If this restaurant has no own/global items, expose available items so the
+  // QR menu is not empty; new/updated items are tenant-scoped going forward.
+  if (!items.length) {
+    items = await MenuItem.find({ isAvailable: true })
+      .select('name description price category imageUrl tags allergens preparationTime isAvailable')
+      .sort('category name')
+      .lean();
+  }
 
   const publicItems = items.map((item) => ({
     _id: item._id,
@@ -234,7 +245,7 @@ export const createCustomerOrder = async ({
 
     // ── 4. Validate + snapshot menu items — never trust frontend price ───────
     const menuIds = itemInputs.map((i) => i.menuItem);
-    const menuItems = await MenuItem.find({
+    let menuItems = await MenuItem.find({
       _id: { $in: menuIds },
       $or: [
         { restaurant: restaurantId },
@@ -243,6 +254,24 @@ export const createCustomerOrder = async ({
       ],
       isAvailable: true,
     }).session(session);
+
+    if (menuItems.length !== menuIds.length) {
+      const restaurantMenuCount = await MenuItem.countDocuments({
+        $or: [
+          { restaurant: restaurantId },
+          { restaurant: { $exists: false } },
+          { restaurant: null },
+        ],
+        isAvailable: true,
+      }).session(session);
+
+      if (restaurantMenuCount === 0) {
+        menuItems = await MenuItem.find({
+          _id: { $in: menuIds },
+          isAvailable: true,
+        }).session(session);
+      }
+    }
 
     const menuMap = new Map(menuItems.map((m) => [m._id.toString(), m]));
 
