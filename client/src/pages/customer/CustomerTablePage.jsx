@@ -38,6 +38,13 @@ const TRACK_STEPS = [
 
 const TRACK_ORDER = TRACK_STEPS.map((step) => step.key);
 
+const APP_TABS = [
+  { key: 'menu', label: 'Menu' },
+  { key: 'order', label: 'Order' },
+  { key: 'track', label: 'Track' },
+  { key: 'user', label: 'User' },
+];
+
 const itemImageUrl = (item, index = 0) =>
   item?.imageUrl || item?.image || FALLBACK_IMAGES[index % FALLBACK_IMAGES.length];
 
@@ -257,9 +264,10 @@ function TrackPanel({
           </div>
           <button
             onClick={onRefresh}
-            className="rounded-full bg-white/20 px-4 py-2 text-xs font-black text-white backdrop-blur hover:bg-white/30"
+            className="grid h-10 w-10 place-items-center rounded-full bg-white/20 text-xl font-black text-white backdrop-blur hover:bg-white/30"
+            aria-label="Refresh order progress"
           >
-            Refresh
+            ↻
           </button>
         </div>
       </div>
@@ -386,6 +394,62 @@ function QrPaymentSheet({ order, tableInfo, onClose }) {
   );
 }
 
+function UserPanel({
+  tableInfo,
+  customerName,
+  setCustomerName,
+  customerPhone,
+  setCustomerPhone,
+  customerNote,
+  setCustomerNote,
+}) {
+  return (
+    <section className="rounded-[1.5rem] bg-[#fbfbfc] p-4 shadow-sm sm:p-5">
+      <div className="rounded-[1.5rem] bg-white p-5 shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-red-50 text-xl font-black text-red-600">
+            {(customerName || tableInfo?.restaurant?.name || 'G').charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <h2 className="truncate text-xl font-black text-gray-950">{customerName || 'Guest customer'}</h2>
+            <p className="truncate text-sm font-bold text-gray-400">
+              {tableInfo?.restaurant?.name || 'Restaurant'} · {tableInfo?.branch?.name || 'Branch'} · Table {tableInfo?.table?.number || '-'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-[1.5rem] bg-white p-5 shadow-sm">
+        <p className="text-xs font-black uppercase tracking-wide text-gray-400">Your details</p>
+        <div className="mt-4 grid gap-3">
+          <input
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            placeholder="Name optional"
+            maxLength={60}
+            className="h-12 w-full rounded-xl bg-gray-50 px-3 text-sm font-semibold outline-none ring-1 ring-gray-100 focus:ring-red-200"
+          />
+          <input
+            value={customerPhone}
+            onChange={(e) => setCustomerPhone(e.target.value)}
+            placeholder="Phone optional"
+            maxLength={20}
+            className="h-12 w-full rounded-xl bg-gray-50 px-3 text-sm font-semibold outline-none ring-1 ring-gray-100 focus:ring-red-200"
+          />
+          <textarea
+            value={customerNote}
+            onChange={(e) => setCustomerNote(e.target.value)}
+            placeholder="Table note optional"
+            maxLength={200}
+            rows={4}
+            className="w-full resize-none rounded-xl bg-gray-50 px-3 py-3 text-sm font-semibold outline-none ring-1 ring-gray-100 focus:ring-red-200"
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function CustomerTablePage() {
   const { restaurantId, branchId, tableId } = useParams();
   const navigate = useNavigate();
@@ -412,6 +476,7 @@ export default function CustomerTablePage() {
   const [showQrPayment, setShowQrPayment] = useState(false);
   const [bill, setBill] = useState(null);
   const [billLoading, setBillLoading] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -426,6 +491,7 @@ export default function CustomerTablePage() {
         setMenu(menuData);
         const cats = Object.keys(menuData.grouped || {});
         if (cats.length) setActiveCategory(cats[0]);
+        setSelectedItem(menuData.items?.[0] || null);
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to load menu. Please scan the QR code again.');
       } finally {
@@ -484,7 +550,7 @@ export default function CustomerTablePage() {
     return source.filter((item) => item.name.toLowerCase().includes(search.toLowerCase()));
   }, [activeCategory, menu.grouped, menu.items, search]);
 
-  const featured = displayedItems[0] || menu.items[0];
+  const featured = selectedItem || displayedItems[0] || menu.items[0];
   const supportingItems = displayedItems.filter((item) => item._id !== featured?._id);
   const recommended = (supportingItems.length ? supportingItems : menu.items.filter((item) => item._id !== featured?._id)).slice(0, 3);
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
@@ -598,21 +664,21 @@ export default function CustomerTablePage() {
             {tableInfo?.restaurant?.name || 'RestroX'}
           </div>
 
-          <nav className="order-3 flex w-full items-center gap-2 overflow-x-auto pb-1 lg:order-none lg:w-auto lg:flex-1">
-            {categories.map((cat) => {
-              const meta = CAT_META[cat] || { icon: '🍴', label: cat };
+          <nav className="order-3 hidden w-full items-center gap-2 overflow-x-auto pb-1 sm:flex lg:order-none lg:w-auto lg:flex-1">
+            {APP_TABS.map((tab) => {
+              const disabled = tab.key === 'track' && !currentOrderId;
               return (
                 <button
-                  key={cat}
-                  onClick={() => { setActiveCategory(cat); setSearch(''); }}
+                  key={tab.key}
+                  onClick={() => !disabled && setActiveTab(tab.key)}
+                  disabled={disabled}
                   className={`flex h-10 shrink-0 items-center gap-2 rounded-full px-3 text-xs font-bold capitalize transition sm:px-4 sm:text-sm ${
-                    activeCategory === cat && !search
-                      ? 'bg-red-50 text-red-600'
+                    activeTab === tab.key
+                      ? 'bg-red-600 text-white shadow-lg shadow-red-100'
                       : 'text-gray-600 hover:bg-gray-50 hover:text-gray-950'
-                  }`}
+                  } disabled:cursor-not-allowed disabled:text-gray-300`}
                 >
-                  <span>{meta.icon}</span>
-                  {meta.label}
+                  {tab.label}
                 </button>
               );
             })}
@@ -622,7 +688,7 @@ export default function CustomerTablePage() {
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">⌕</span>
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setSelectedItem(null); }}
               placeholder="Search dishes"
               className="h-11 w-full rounded-full bg-gray-50 pl-10 pr-4 text-sm font-semibold outline-none ring-1 ring-gray-100 focus:ring-red-200"
             />
@@ -649,30 +715,6 @@ export default function CustomerTablePage() {
           </div>
         </section>
 
-        <div className="mb-4 hidden grid-cols-3 gap-2 rounded-[1.25rem] bg-white p-2 shadow-sm sm:grid">
-          {[
-            { key: 'menu', label: 'Menu' },
-            { key: 'order', label: 'Order' },
-            { key: 'track', label: 'Track' },
-          ].map((tab) => {
-            const disabled = tab.key === 'track' && !currentOrderId;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => !disabled && setActiveTab(tab.key)}
-                disabled={disabled}
-                className={`rounded-full px-3 py-3 text-sm font-black transition ${
-                  activeTab === tab.key
-                    ? 'bg-red-600 text-white shadow-lg shadow-red-100'
-                    : 'text-gray-500 hover:bg-gray-50'
-                } disabled:cursor-not-allowed disabled:text-gray-300`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-
         {activeTab === 'track' ? (
           <TrackPanel
             order={currentOrder}
@@ -683,6 +725,16 @@ export default function CustomerTablePage() {
             onViewBill={handleViewBill}
             onSubmitFeedback={handleSubmitFeedback}
             billLoading={billLoading}
+          />
+        ) : activeTab === 'user' ? (
+          <UserPanel
+            tableInfo={tableInfo}
+            customerName={customerName}
+            setCustomerName={setCustomerName}
+            customerPhone={customerPhone}
+            setCustomerPhone={setCustomerPhone}
+            customerNote={customerNote}
+            setCustomerNote={setCustomerNote}
           />
         ) : (
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -703,7 +755,7 @@ export default function CustomerTablePage() {
               {categories.map((cat) => (
                 <button
                   key={cat}
-                  onClick={() => { setActiveCategory(cat); setSearch(''); }}
+                  onClick={() => { setActiveCategory(cat); setSearch(''); setSelectedItem(null); }}
                   className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold capitalize transition ${
                     activeCategory === cat && !search ? 'bg-black text-white' : 'bg-white text-gray-600 hover:bg-gray-100'
                   }`}
@@ -768,13 +820,20 @@ export default function CustomerTablePage() {
                 </div>
                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                   {recommended.map((item, index) => (
-                    <div key={item._id} className="relative flex items-center gap-3 rounded-2xl border border-dashed border-gray-200 bg-white p-3 pr-14">
+                    <div
+                      key={item._id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSelectedItem(item)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') setSelectedItem(item); }}
+                      className="relative flex w-full items-center gap-3 rounded-2xl border border-dashed border-gray-200 bg-white p-3 pr-24 text-left transition hover:border-red-100 hover:bg-red-50/30"
+                    >
                       <DishImage item={item} index={index + 1} className="h-16 w-16 rounded-full sm:h-20 sm:w-20" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-black text-gray-950">{item.name}</p>
                         <p className="mt-1 text-xs font-bold text-red-600">{formatCurrency(item.price)}</p>
                       </div>
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2" onClick={(e) => e.stopPropagation()}>
                         <QtyControl
                           compact
                           qty={cartQty(item._id)}
@@ -794,14 +853,21 @@ export default function CustomerTablePage() {
                 <h3 className="mb-3 text-sm font-black uppercase tracking-wide text-gray-500">More Dishes</h3>
                 <div className="grid gap-3 lg:grid-cols-2">
                   {supportingItems.slice(0, 8).map((item, index) => (
-                    <div key={item._id} className="relative flex items-center gap-3 rounded-2xl bg-white p-3 pr-14 shadow-sm">
+                    <div
+                      key={item._id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSelectedItem(item)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') setSelectedItem(item); }}
+                      className="relative flex w-full items-center gap-3 rounded-2xl bg-white p-3 pr-24 text-left shadow-sm transition hover:bg-red-50/30"
+                    >
                       <DishImage item={item} index={index + 2} className="h-16 w-16 rounded-2xl sm:h-20 sm:w-20" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-black text-gray-950">{item.name}</p>
                         <p className="line-clamp-1 text-xs text-gray-400">{item.description || item.category}</p>
                         <p className="mt-1 text-sm font-black text-red-600">{formatCurrency(item.price)}</p>
                       </div>
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2" onClick={(e) => e.stopPropagation()}>
                         <QtyControl
                           compact
                           qty={cartQty(item._id)}
@@ -922,8 +988,8 @@ export default function CustomerTablePage() {
 
       <nav className="fixed inset-x-1 bottom-2 z-40 grid grid-cols-5 items-end rounded-[1.75rem] bg-white px-1 pb-2 pt-2 shadow-2xl shadow-gray-400/40 ring-1 ring-gray-100 sm:hidden">
         {[
-          { key: 'menu', label: 'Home', icon: '⌂' },
-          { key: 'order', label: 'Cart', icon: '☰' },
+          { key: 'menu', label: 'Menu', icon: '☰' },
+          { key: 'order', label: 'Order', icon: '▤' },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -953,10 +1019,6 @@ export default function CustomerTablePage() {
             key={tab.key}
             onClick={() => {
               if (tab.disabled) return;
-              if (tab.key === 'user') {
-                setActiveTab('order');
-                return;
-              }
               setActiveTab(tab.key);
             }}
             disabled={tab.disabled}
