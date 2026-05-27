@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "RestroX Customer",
+    "slug": "restrox-customer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {},
+    "extra": {
+      "apiUrl": "http://localhost:5000/api"
+    }
+  }
+}
