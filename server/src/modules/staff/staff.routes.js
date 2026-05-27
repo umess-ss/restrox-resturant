@@ -40,10 +40,6 @@ router.post(
   validate,
   createStaff
 );
-router.get('/:id', selfOrAdmin, getStaffMember);
-router.put('/:id', can('staff:write'), updateStaff);
-router.put('/:id/profile', can('staff:write'), upsertProfile);
-router.delete('/:id', can('staff:delete'), deleteStaff);
 
 // ─── Attendance: self ─────────────────────────────────────────────────────────
 
@@ -100,5 +96,13 @@ router.post('/payroll/run', authorize('admin', 'manager'), runPayroll);
 router.post('/payroll/:userId/calculate', authorize('admin', 'manager'), calculateStaffPayroll);
 router.patch('/payroll/:id/approve', authorize('admin', 'manager'), approvePayroll);
 router.patch('/payroll/:id/paid', authorize('admin'), markPayrollPaid);
+
+// ─── Staff member detail routes ───────────────────────────────────────────────
+// Keep parameterized routes after feature namespaces so /attendance, /shifts,
+// and /payroll are not interpreted as staff IDs.
+router.get('/:id', selfOrAdmin, getStaffMember);
+router.put('/:id', can('staff:write'), updateStaff);
+router.put('/:id/profile', can('staff:write'), upsertProfile);
+router.delete('/:id', can('staff:delete'), deleteStaff);
 
 export default router;

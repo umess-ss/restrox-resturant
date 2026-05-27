@@ -13,18 +13,24 @@ const ROLE_ROOMS = {
   admin:   [ROOMS.pos,     ROOMS.managers, ROOMS.role('admin')],
 };
 
-const socketAllowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:5174',
-  process.env.CLIENT_URL,
-].filter(Boolean);
+// Allow Vite dev server origins during development (ports vary), and
+// otherwise restrict to configured CLIENT_URL. Also allow no-origin (non-browser clients).
+const socketAllowedOrigins = [process.env.CLIENT_URL].filter(Boolean);
 
 const socketCorsOrigin = (origin, callback) => {
+  // No origin (e.g. some non-browser clients) — allow
   if (!origin) return callback(null, true);
+
+  // In development, accept any localhost origin (vite may use different ports)
+  if (process.env.NODE_ENV === 'development' && origin.startsWith('http://localhost')) {
+    return callback(null, true);
+  }
+
   if (socketAllowedOrigins.includes(origin)) {
     return callback(null, true);
   }
-  return callback(null, false);
+
+  return callback(new Error('Origin not allowed by CORS'));
 };
 
 // ─── Auth middleware ──────────────────────────────────────────────────────────
