@@ -2,10 +2,14 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   appendPublicOrderItems,
+  callPublicWaiter,
+  fetchPublicBill,
   fetchPublicTable,
   fetchPublicMenu,
   fetchPublicOrderStatus,
   placePublicOrder,
+  requestPublicBill,
+  submitPublicFeedback,
 } from '../../api/public.api.js';
 import formatCurrency from '../../utils/formatCurrency.js';
 
@@ -58,7 +62,7 @@ function QtyControl({ qty = 0, onAdd, onMinus, onPlus, compact = false }) {
       <button
         onClick={onAdd}
         className={compact
-          ? 'grid h-8 w-8 place-items-center rounded-full bg-black text-sm font-bold text-white transition hover:bg-red-600'
+          ? 'grid h-9 w-9 shrink-0 place-items-center rounded-full bg-black text-sm font-bold text-white transition hover:bg-red-600'
           : 'rounded-full bg-black px-7 py-3 text-sm font-bold text-white transition hover:bg-red-600'}
       >
         {compact ? '+' : 'Add to order'}
@@ -110,7 +114,106 @@ function NotesModal({ item, current, onSave, onClose }) {
   );
 }
 
-function TrackPanel({ order, loading, onRefresh }) {
+function FeedbackBox({ onSubmit }) {
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
+  const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await onSubmit({ rating, comment });
+      setSent(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (sent) {
+    return (
+      <div className="rounded-[1.25rem] bg-green-50 p-5 text-center text-sm font-bold text-green-700 ring-1 ring-green-100">
+        Thank you for your feedback.
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="rounded-[1.25rem] bg-white p-5 shadow-sm">
+      <h3 className="text-sm font-black uppercase tracking-wide text-gray-500">Feedback</h3>
+      <div className="mt-3 flex gap-1">
+        {[1, 2, 3, 4, 5].map((value) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setRating(value)}
+            className={`text-2xl ${value <= rating ? 'text-orange-400' : 'text-gray-200'}`}
+            aria-label={`${value} star rating`}
+          >
+            ★
+          </button>
+        ))}
+      </div>
+      <textarea
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        rows={3}
+        maxLength={600}
+        placeholder="Write a short comment..."
+        className="mt-3 w-full resize-none rounded-2xl bg-gray-50 px-4 py-3 text-sm font-semibold outline-none ring-1 ring-gray-100 focus:ring-red-200"
+      />
+      <button disabled={loading} className="mt-3 w-full rounded-full bg-red-600 py-3 text-sm font-black text-white disabled:opacity-50">
+        {loading ? 'Submitting...' : 'Submit Feedback'}
+      </button>
+    </form>
+  );
+}
+
+function BillSheet({ bill, onClose }) {
+  if (!bill) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/55 p-3 sm:items-center">
+      <div className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-[2rem] bg-white p-5 shadow-2xl">
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-wide text-red-600">Running Bill</p>
+            <h3 className="mt-1 text-xl font-black text-gray-950">{bill.orderNumber}</h3>
+            <p className="text-sm font-semibold text-gray-400">Table {bill.tableNumber}</p>
+          </div>
+          <button onClick={onClose} className="grid h-10 w-10 place-items-center rounded-full bg-gray-100 text-xl text-gray-500">×</button>
+        </div>
+
+        <div className="space-y-2">
+          {bill.items?.map((item, index) => (
+            <div key={`${item.name}-${index}`} className="flex justify-between gap-3 text-sm">
+              <span className="font-bold text-gray-700">{item.name} x{item.quantity}</span>
+              <span className="font-black text-gray-950">{formatCurrency(item.lineTotal)}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 space-y-2 border-t border-dashed border-gray-200 pt-4 text-sm">
+          <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>{formatCurrency(bill.subtotal)}</span></div>
+          <div className="flex justify-between text-gray-500"><span>Tax</span><span>{formatCurrency(bill.tax)}</span></div>
+          <div className="flex justify-between text-lg font-black text-gray-950"><span>Total</span><span>{formatCurrency(bill.totalAmount)}</span></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TrackPanel({
+  order,
+  loading,
+  onRefresh,
+  onCallWaiter,
+  onRequestBill,
+  onViewBill,
+  onSubmitFeedback,
+  billLoading,
+}) {
   if (loading) {
     return (
       <section className="rounded-[1.5rem] bg-[#fbfbfc] p-5 shadow-sm">
@@ -203,6 +306,37 @@ function TrackPanel({ order, loading, onRefresh }) {
           </div>
         </div>
       </div>
+
+      {!isClosed && (
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <button
+            onClick={onCallWaiter}
+            className="rounded-full bg-white px-4 py-3 text-sm font-black text-red-600 shadow-sm ring-1 ring-red-100 hover:bg-red-50"
+          >
+            Call Waiter
+          </button>
+          <button
+            onClick={onRequestBill}
+            disabled={order.billStatus === 'requested' || order.billStatus === 'presented'}
+            className="rounded-full bg-white px-4 py-3 text-sm font-black text-blue-600 shadow-sm ring-1 ring-blue-100 hover:bg-blue-50 disabled:text-gray-300 disabled:ring-gray-100"
+          >
+            Request Bill
+          </button>
+          <button
+            onClick={onViewBill}
+            disabled={billLoading}
+            className="rounded-full bg-gray-950 px-4 py-3 text-sm font-black text-white shadow-sm disabled:opacity-50"
+          >
+            {billLoading ? 'Loading...' : 'View Bill'}
+          </button>
+        </div>
+      )}
+
+      {['served', 'paid'].includes(order.status) && (
+        <div className="mt-4">
+          <FeedbackBox onSubmit={onSubmitFeedback} />
+        </div>
+      )}
     </section>
   );
 }
@@ -276,6 +410,8 @@ export default function CustomerTablePage() {
   const [currentOrder, setCurrentOrder] = useState(null);
   const [orderLoading, setOrderLoading] = useState(false);
   const [showQrPayment, setShowQrPayment] = useState(false);
+  const [bill, setBill] = useState(null);
+  const [billLoading, setBillLoading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -356,6 +492,43 @@ export default function CustomerTablePage() {
 
   const cartQty = (id) => cart.find((item) => item._id === id)?.qty || 0;
 
+  const handleCallWaiter = async () => {
+    if (!currentOrderId) return;
+    try {
+      await callPublicWaiter(currentOrderId);
+      alert('Waiter has been notified.');
+    } catch {
+      alert('Could not call waiter. Please try again.');
+    }
+  };
+
+  const handleRequestBill = async () => {
+    if (!currentOrderId) return;
+    try {
+      await requestPublicBill(currentOrderId);
+      await loadCurrentOrder();
+    } catch {
+      alert('Could not request bill. Please call the waiter.');
+    }
+  };
+
+  const handleViewBill = async () => {
+    if (!currentOrderId) return;
+    setBillLoading(true);
+    try {
+      setBill(await fetchPublicBill(currentOrderId));
+    } catch {
+      alert('Could not load bill. Please try again.');
+    } finally {
+      setBillLoading(false);
+    }
+  };
+
+  const handleSubmitFeedback = async (data) => {
+    if (!currentOrderId) return;
+    await submitPublicFeedback(currentOrderId, data);
+  };
+
   const submitOrder = async () => {
     if (submitting || !cart.length) return;
     setSubmitting(true);
@@ -418,8 +591,8 @@ export default function CustomerTablePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#e9e9f1] px-3 pb-28 pt-3 text-gray-950 sm:px-5 sm:py-5 lg:px-8 lg:py-8">
-      <div className="mx-auto w-full max-w-[1440px] rounded-[1.25rem] bg-white/80 p-3 shadow-2xl shadow-gray-300/70 ring-1 ring-white sm:rounded-[2rem] sm:p-5">
+    <div className="min-h-screen overflow-x-hidden bg-[#e9e9f1] px-2 pb-28 pt-2 text-gray-950 sm:px-5 sm:py-5 lg:px-8 lg:py-8">
+      <div className="mx-auto w-full max-w-[1440px] rounded-[1.25rem] bg-white/80 p-2 pb-24 shadow-2xl shadow-gray-300/70 ring-1 ring-white sm:rounded-[2rem] sm:p-5">
         <header className="mb-4 flex flex-wrap items-center gap-3 rounded-[1.25rem] bg-white px-3 py-3 shadow-sm sm:rounded-[1.5rem] sm:px-5 lg:flex-nowrap">
           <div className="mr-auto min-w-0 text-lg font-black tracking-tight text-red-600 sm:mr-3 sm:text-xl">
             {tableInfo?.restaurant?.name || 'RestroX'}
@@ -473,12 +646,6 @@ export default function CustomerTablePage() {
                 {tableInfo?.restaurant?.name || 'Restaurant'} · Table {tableInfo?.table?.number || '-'}
               </p>
             </div>
-            <button
-              onClick={() => setShowQrPayment(true)}
-              className="rounded-full bg-gray-950 px-4 py-3 text-xs font-black text-white"
-            >
-              QR Pay
-            </button>
           </div>
         </section>
 
@@ -507,7 +674,16 @@ export default function CustomerTablePage() {
         </div>
 
         {activeTab === 'track' ? (
-          <TrackPanel order={currentOrder} loading={orderLoading} onRefresh={loadCurrentOrder} />
+          <TrackPanel
+            order={currentOrder}
+            loading={orderLoading}
+            onRefresh={loadCurrentOrder}
+            onCallWaiter={handleCallWaiter}
+            onRequestBill={handleRequestBill}
+            onViewBill={handleViewBill}
+            onSubmitFeedback={handleSubmitFeedback}
+            billLoading={billLoading}
+          />
         ) : (
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
           <main className={`${activeTab === 'menu' ? 'block' : 'hidden'} min-h-[520px] rounded-[1.25rem] bg-[#fbfbfc] p-3 shadow-sm sm:rounded-[1.5rem] sm:p-5 xl:block`}>
@@ -538,17 +714,17 @@ export default function CustomerTablePage() {
             </div>
 
             {featured ? (
-              <section className="grid gap-5 rounded-[1.25rem] bg-white p-4 shadow-sm lg:grid-cols-[42%_1fr] lg:gap-8 lg:p-6">
-                <div className="relative flex aspect-[4/3] min-h-[220px] items-center justify-center overflow-hidden rounded-[1.25rem] bg-red-50 sm:min-h-[300px] lg:min-h-[360px]">
+              <section className="grid min-w-0 gap-5 overflow-hidden rounded-[1.25rem] bg-white p-4 shadow-sm lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:gap-6 lg:p-6">
+                <div className="relative flex aspect-[4/3] min-h-[220px] min-w-0 items-center justify-center overflow-hidden rounded-[1.25rem] bg-red-50 sm:min-h-[300px] lg:min-h-[320px]">
                   <div className="absolute inset-6 rounded-full bg-red-100 sm:inset-10" />
-                  <DishImage item={featured} className="relative h-56 w-56 rounded-full shadow-2xl shadow-red-100 sm:h-72 sm:w-72 lg:h-80 lg:w-80" />
+                  <DishImage item={featured} className="relative h-56 w-56 max-w-[88%] rounded-full shadow-2xl shadow-red-100 sm:h-72 sm:w-72 lg:h-72 lg:w-72 xl:h-80 xl:w-80" />
                 </div>
 
-                <div className="flex flex-col justify-center">
+                <div className="flex min-w-0 flex-col justify-center">
                   <p className="mb-2 text-xs font-black uppercase tracking-wide text-gray-400">
                     {featured.category || 'Featured'}
                   </p>
-                  <h2 className="max-w-lg text-3xl font-black leading-tight tracking-tight text-gray-950 sm:text-4xl lg:text-5xl">
+                  <h2 className="max-w-lg break-words text-3xl font-black leading-tight tracking-tight text-gray-950 sm:text-4xl lg:text-4xl xl:text-5xl">
                     {featured.name}
                   </h2>
                   <p className="mt-4 max-w-md text-sm leading-6 text-gray-500">
@@ -592,19 +768,21 @@ export default function CustomerTablePage() {
                 </div>
                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                   {recommended.map((item, index) => (
-                    <div key={item._id} className="flex items-center gap-3 rounded-2xl border border-dashed border-gray-200 bg-white p-3">
+                    <div key={item._id} className="relative flex items-center gap-3 rounded-2xl border border-dashed border-gray-200 bg-white p-3 pr-14">
                       <DishImage item={item} index={index + 1} className="h-16 w-16 rounded-full sm:h-20 sm:w-20" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-black text-gray-950">{item.name}</p>
                         <p className="mt-1 text-xs font-bold text-red-600">{formatCurrency(item.price)}</p>
                       </div>
-                      <QtyControl
-                        compact
-                        qty={cartQty(item._id)}
-                        onAdd={() => addToCart(item)}
-                        onMinus={() => changeQty(item._id, cartQty(item._id) - 1)}
-                        onPlus={() => changeQty(item._id, cartQty(item._id) + 1)}
-                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <QtyControl
+                          compact
+                          qty={cartQty(item._id)}
+                          onAdd={() => addToCart(item)}
+                          onMinus={() => changeQty(item._id, cartQty(item._id) - 1)}
+                          onPlus={() => changeQty(item._id, cartQty(item._id) + 1)}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -616,20 +794,22 @@ export default function CustomerTablePage() {
                 <h3 className="mb-3 text-sm font-black uppercase tracking-wide text-gray-500">More Dishes</h3>
                 <div className="grid gap-3 lg:grid-cols-2">
                   {supportingItems.slice(0, 8).map((item, index) => (
-                    <div key={item._id} className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm">
+                    <div key={item._id} className="relative flex items-center gap-3 rounded-2xl bg-white p-3 pr-14 shadow-sm">
                       <DishImage item={item} index={index + 2} className="h-16 w-16 rounded-2xl sm:h-20 sm:w-20" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-black text-gray-950">{item.name}</p>
                         <p className="line-clamp-1 text-xs text-gray-400">{item.description || item.category}</p>
                         <p className="mt-1 text-sm font-black text-red-600">{formatCurrency(item.price)}</p>
                       </div>
-                      <QtyControl
-                        compact
-                        qty={cartQty(item._id)}
-                        onAdd={() => addToCart(item)}
-                        onMinus={() => changeQty(item._id, cartQty(item._id) - 1)}
-                        onPlus={() => changeQty(item._id, cartQty(item._id) + 1)}
-                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <QtyControl
+                          compact
+                          qty={cartQty(item._id)}
+                          onAdd={() => addToCart(item)}
+                          onMinus={() => changeQty(item._id, cartQty(item._id) - 1)}
+                          onPlus={() => changeQty(item._id, cartQty(item._id) + 1)}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -686,26 +866,23 @@ export default function CustomerTablePage() {
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 placeholder="Name optional"
-                disabled={isAppendMode}
                 maxLength={60}
-                className="h-11 w-full rounded-xl bg-gray-50 px-3 text-sm font-semibold outline-none ring-1 ring-gray-100 focus:ring-red-200 disabled:cursor-not-allowed disabled:opacity-50"
+                className="h-11 w-full rounded-xl bg-gray-50 px-3 text-sm font-semibold outline-none ring-1 ring-gray-100 focus:ring-red-200"
               />
               <input
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
                 placeholder="Phone optional"
-                disabled={isAppendMode}
                 maxLength={20}
-                className="h-11 w-full rounded-xl bg-gray-50 px-3 text-sm font-semibold outline-none ring-1 ring-gray-100 focus:ring-red-200 disabled:cursor-not-allowed disabled:opacity-50"
+                className="h-11 w-full rounded-xl bg-gray-50 px-3 text-sm font-semibold outline-none ring-1 ring-gray-100 focus:ring-red-200"
               />
               <textarea
                 value={customerNote}
                 onChange={(e) => setCustomerNote(e.target.value)}
                 placeholder="Table note optional"
-                disabled={isAppendMode}
                 maxLength={200}
                 rows={2}
-                className="w-full resize-none rounded-xl bg-gray-50 px-3 py-3 text-sm font-semibold outline-none ring-1 ring-gray-100 focus:ring-red-200 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full resize-none rounded-xl bg-gray-50 px-3 py-3 text-sm font-semibold outline-none ring-1 ring-gray-100 focus:ring-red-200"
               />
             </div>
 
@@ -743,7 +920,7 @@ export default function CustomerTablePage() {
         )}
       </div>
 
-      <nav className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-5 items-end rounded-[2rem] bg-white px-3 pb-3 pt-2 shadow-2xl shadow-gray-400/40 ring-1 ring-gray-100 sm:hidden">
+      <nav className="fixed inset-x-1 bottom-2 z-40 grid grid-cols-5 items-end rounded-[1.75rem] bg-white px-1 pb-2 pt-2 shadow-2xl shadow-gray-400/40 ring-1 ring-gray-100 sm:hidden">
         {[
           { key: 'menu', label: 'Home', icon: '⌂' },
           { key: 'order', label: 'Cart', icon: '☰' },
@@ -751,7 +928,7 @@ export default function CustomerTablePage() {
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`grid justify-items-center gap-1 rounded-2xl px-2 py-2 text-xs font-black ${
+            className={`grid min-w-0 justify-items-center gap-1 rounded-2xl px-1 py-2 text-[11px] font-black ${
               activeTab === tab.key ? 'text-red-600' : 'text-gray-400'
             }`}
           >
@@ -783,7 +960,7 @@ export default function CustomerTablePage() {
               setActiveTab(tab.key);
             }}
             disabled={tab.disabled}
-            className={`grid justify-items-center gap-1 rounded-2xl px-2 py-2 text-xs font-black ${
+            className={`grid min-w-0 justify-items-center gap-1 rounded-2xl px-1 py-2 text-[11px] font-black ${
               activeTab === tab.key ? 'text-red-600' : 'text-gray-400'
             } disabled:text-gray-200`}
           >
@@ -800,6 +977,8 @@ export default function CustomerTablePage() {
           onClose={() => setShowQrPayment(false)}
         />
       )}
+
+      <BillSheet bill={bill} onClose={() => setBill(null)} />
 
       {notesModal && (
         <NotesModal
