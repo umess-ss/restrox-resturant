@@ -4,6 +4,7 @@ import {
   appendPublicOrderItems,
   fetchPublicTable,
   fetchPublicMenu,
+  fetchPublicOrderStatus,
   placePublicOrder,
 } from '../../api/public.api.js';
 import formatCurrency from '../../utils/formatCurrency.js';
@@ -21,6 +22,17 @@ const FALLBACK_IMAGES = [
   'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=900&q=80',
   'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=900&q=80',
 ];
+
+const TRACK_STEPS = [
+  { key: 'pending', label: 'Order received', icon: '📋' },
+  { key: 'confirmed', label: 'Confirmed', icon: '✅' },
+  { key: 'preparing', label: 'Preparing', icon: '👨‍🍳' },
+  { key: 'ready', label: 'Ready', icon: '🔔' },
+  { key: 'served', label: 'Served', icon: '🍽' },
+  { key: 'paid', label: 'Paid', icon: '💳' },
+];
+
+const TRACK_ORDER = TRACK_STEPS.map((step) => step.key);
 
 const itemImageUrl = (item, index = 0) =>
   item?.imageUrl || item?.image || FALLBACK_IMAGES[index % FALLBACK_IMAGES.length];
@@ -98,6 +110,103 @@ function NotesModal({ item, current, onSave, onClose }) {
   );
 }
 
+function TrackPanel({ order, loading, onRefresh }) {
+  if (loading) {
+    return (
+      <section className="rounded-[1.5rem] bg-[#fbfbfc] p-5 shadow-sm">
+        <div className="grid min-h-[360px] place-items-center">
+          <div className="text-center">
+            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-red-600 border-t-transparent" />
+            <p className="mt-3 text-sm font-bold text-gray-400">Loading order progress...</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (!order) {
+    return (
+      <section className="rounded-[1.5rem] bg-[#fbfbfc] p-5 shadow-sm">
+        <div className="grid min-h-[360px] place-items-center rounded-[1.25rem] bg-white p-6 text-center">
+          <div>
+            <p className="text-4xl">⌁</p>
+            <h2 className="mt-3 text-xl font-black text-gray-950">No active order yet</h2>
+            <p className="mt-2 text-sm font-semibold text-gray-400">Add dishes and confirm your order to start tracking.</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  const activeIndex = TRACK_ORDER.indexOf(order.status);
+  const isClosed = ['paid', 'cancelled'].includes(order.status);
+
+  return (
+    <section className="rounded-[1.5rem] bg-[#fbfbfc] p-4 shadow-sm sm:p-5">
+      <div className="overflow-hidden rounded-[1.5rem] bg-gradient-to-br from-red-500 to-orange-400 p-5 text-white shadow-xl shadow-red-100 sm:p-7">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-bold text-white/80">Table {order.tableNumber || '-'}</p>
+            <h2 className="mt-1 text-3xl font-black">{order.orderNumber}</h2>
+            <p className="mt-2 max-w-md text-sm font-semibold text-white/85">
+              {isClosed ? 'Thanks for dining with us.' : 'Track your food while you keep browsing the menu.'}
+            </p>
+          </div>
+          <button
+            onClick={onRefresh}
+            className="rounded-full bg-white/20 px-4 py-2 text-xs font-black text-white backdrop-blur hover:bg-white/30"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_320px]">
+        <div className="rounded-[1.25rem] bg-white p-5 shadow-sm">
+          <h3 className="text-sm font-black uppercase tracking-wide text-gray-500">Order Progress</h3>
+          <div className="mt-5 space-y-4">
+            {TRACK_STEPS.map((step, index) => {
+              const done = activeIndex >= index;
+              const active = activeIndex === index;
+              return (
+                <div key={step.key} className="flex items-center gap-3">
+                  <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm ${
+                    done ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-400'
+                  } ${active ? 'ring-4 ring-red-100' : ''}`}>
+                    {done ? step.icon : '○'}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-black ${done ? 'text-gray-950' : 'text-gray-400'}`}>{step.label}</p>
+                    {active && <p className="text-xs font-bold text-red-500">Current status</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="rounded-[1.25rem] bg-white p-5 shadow-sm">
+          <h3 className="text-sm font-black uppercase tracking-wide text-gray-500">Your Items</h3>
+          <div className="mt-4 space-y-3">
+            {order.items?.map((item, index) => (
+              <div key={`${item.name}-${index}`} className="flex justify-between gap-3 text-sm">
+                <span className="font-bold text-gray-700">{item.name} <span className="text-gray-400">x{item.quantity}</span></span>
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-bold capitalize text-gray-500">{item.itemStatus}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-5 border-t border-dashed border-gray-200 pt-4">
+            <div className="flex justify-between text-base font-black text-gray-950">
+              <span>Total</span>
+              <span>{formatCurrency(order.totalAmount || 0)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function CustomerTablePage() {
   const { restaurantId, branchId, tableId } = useParams();
   const navigate = useNavigate();
@@ -117,6 +226,10 @@ export default function CustomerTablePage() {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerNote, setCustomerNote] = useState('');
+  const [activeTab, setActiveTab] = useState('menu');
+  const [currentOrderId, setCurrentOrderId] = useState(appendOrderId || '');
+  const [currentOrder, setCurrentOrder] = useState(null);
+  const [orderLoading, setOrderLoading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -139,6 +252,32 @@ export default function CustomerTablePage() {
     };
     load();
   }, [restaurantId, branchId, tableId]);
+
+  useEffect(() => {
+    setCurrentOrderId(appendOrderId || '');
+  }, [appendOrderId]);
+
+  const loadCurrentOrder = useCallback(async ({ silent = false } = {}) => {
+    if (!currentOrderId) {
+      setCurrentOrder(null);
+      return;
+    }
+    if (!silent) setOrderLoading(true);
+    try {
+      setCurrentOrder(await fetchPublicOrderStatus(currentOrderId));
+    } catch {
+      setCurrentOrder(null);
+    } finally {
+      if (!silent) setOrderLoading(false);
+    }
+  }, [currentOrderId]);
+
+  useEffect(() => {
+    loadCurrentOrder();
+    if (!currentOrderId) return undefined;
+    const timer = setInterval(() => loadCurrentOrder({ silent: true }), 10000);
+    return () => clearInterval(timer);
+  }, [currentOrderId, loadCurrentOrder]);
 
   const addToCart = useCallback((item) => {
     setCart((prev) => {
@@ -182,8 +321,10 @@ export default function CustomerTablePage() {
       }));
 
       if (isAppendMode) {
-        await appendPublicOrderItems(appendOrderId, { items });
-        navigate(`/customer/order/${appendOrderId}/status`, { replace: true });
+        const updatedOrder = await appendPublicOrderItems(appendOrderId, { items });
+        setCurrentOrder(updatedOrder);
+        setCart([]);
+        setActiveTab('track');
         return;
       }
 
@@ -196,7 +337,10 @@ export default function CustomerTablePage() {
         customerPhone: customerPhone || undefined,
         customerNote: customerNote || undefined,
       });
-      navigate(`/customer/order/${result.orderId}/status`, { replace: true });
+      setCurrentOrderId(result.orderId);
+      setActiveTab('track');
+      setCart([]);
+      navigate(`/customer/${restaurantId}/${branchId}/table/${tableId}?orderId=${result.orderId}`, { replace: true });
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to update order. Please try again.');
     } finally {
@@ -270,8 +414,35 @@ export default function CustomerTablePage() {
           </div>
         </header>
 
+        <div className="mb-4 grid grid-cols-3 gap-2 rounded-[1.25rem] bg-white p-2 shadow-sm">
+          {[
+            { key: 'menu', label: 'Menu' },
+            { key: 'order', label: 'Order' },
+            { key: 'track', label: 'Track' },
+          ].map((tab) => {
+            const disabled = tab.key === 'track' && !currentOrderId;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => !disabled && setActiveTab(tab.key)}
+                disabled={disabled}
+                className={`rounded-full px-3 py-3 text-sm font-black transition ${
+                  activeTab === tab.key
+                    ? 'bg-red-600 text-white shadow-lg shadow-red-100'
+                    : 'text-gray-500 hover:bg-gray-50'
+                } disabled:cursor-not-allowed disabled:text-gray-300`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {activeTab === 'track' ? (
+          <TrackPanel order={currentOrder} loading={orderLoading} onRefresh={loadCurrentOrder} />
+        ) : (
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <main className="min-h-[520px] rounded-[1.25rem] bg-[#fbfbfc] p-3 shadow-sm sm:rounded-[1.5rem] sm:p-5">
+          <main className={`${activeTab === 'menu' ? 'block' : 'hidden'} min-h-[520px] rounded-[1.25rem] bg-[#fbfbfc] p-3 shadow-sm sm:rounded-[1.5rem] sm:p-5 xl:block`}>
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs font-black uppercase tracking-wide text-red-600">Meal Category</p>
@@ -398,7 +569,7 @@ export default function CustomerTablePage() {
             )}
           </main>
 
-          <aside className="rounded-[1.25rem] bg-[#fbfbfc] p-4 shadow-sm sm:rounded-[1.5rem] sm:p-5 xl:sticky xl:top-5 xl:self-start">
+          <aside className={`${activeTab === 'order' ? 'block' : 'hidden'} rounded-[1.25rem] bg-[#fbfbfc] p-4 shadow-sm sm:rounded-[1.5rem] sm:p-5 xl:sticky xl:top-5 xl:block xl:self-start`}>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-black text-gray-950">My Order</h2>
               <span className="text-sm font-semibold text-gray-400">{cart.length} positions</span>
@@ -490,9 +661,18 @@ export default function CustomerTablePage() {
               >
                 {submitting ? 'Confirming...' : isAppendMode ? 'Add Items to Order' : 'Confirm Order'}
               </button>
+              {currentOrderId && (
+                <button
+                  onClick={() => setActiveTab('track')}
+                  className="w-full rounded-full bg-white py-4 text-sm font-black text-red-600 ring-1 ring-red-100 transition hover:bg-red-50"
+                >
+                  Track Current Order
+                </button>
+              )}
             </div>
           </aside>
         </div>
+        )}
       </div>
 
       {notesModal && (
