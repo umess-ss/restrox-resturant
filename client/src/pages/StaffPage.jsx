@@ -8,6 +8,7 @@ import {
   clockIn, clockOut, startBreak, endBreak, fetchMyToday,
   createShift, calculatePayroll,
 } from '../api/staff.api.js';
+import formatCurrency from '../utils/formatCurrency.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -42,7 +43,7 @@ const PAYROLL_STATUS = {
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-const money = (value = 0) => `$${Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+const money = formatCurrency;
 
 function Avatar({ name, className = 'h-10 w-10' }) {
   const initials = (name || 'Staff')
@@ -331,7 +332,7 @@ function RosterTab({ refreshKey }) {
                 </td>
                 <td className="px-4 py-3 text-gray-600 text-xs">
                   {s.profile?.baseSalary
-                    ? `$${s.profile.baseSalary.toLocaleString()} / ${s.profile.salaryType === 'hourly' ? 'hr' : 'mo'}`
+                    ? `${money(s.profile.baseSalary)} / ${s.profile.salaryType === 'hourly' ? 'hr' : 'mo'}`
                     : '—'}
                 </td>
                 <td className="px-4 py-3 text-xs text-gray-500">
@@ -530,7 +531,7 @@ function PayrollTab() {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-4">
-        <StatCard label="Total Payroll Processed" value={money(totalNetPay)} tone="purple" icon="$" helper="Total salary paid within the selected period." />
+        <StatCard label="Total Payroll Processed" value={money(totalNetPay)} tone="purple" icon="Rs" helper="Total salary paid within the selected period." />
         <StatCard label="Payroll On Time Rate" value={`${onTimeRate}%`} tone="blue" icon="◷" helper="Payrolls approved or paid without delay." />
         <StatCard label="Payslips Issued" value={paidCount + approvedCount} tone="green" icon="▤" helper="Payslips generated and sent to employees." />
         <StatCard label="Pending Records" value={draftCount} tone="red" icon="!" helper="Records still waiting for approval." />
@@ -579,10 +580,10 @@ function PayrollTab() {
                       {r.totalNetHours}h
                       {r.totalOvertimeHours > 0 && <span className="text-orange-500"> +{r.totalOvertimeHours}OT</span>}
                     </td>
-                    <td className="py-3 text-right text-gray-700">${r.basePay?.toFixed(2)}</td>
-                    <td className="py-3 text-right text-orange-600">${r.overtimePay?.toFixed(2)}</td>
-                    <td className="py-3 text-right text-red-500">-${r.totalDeductions?.toFixed(2)}</td>
-                    <td className="py-3 text-right font-extrabold text-gray-900">${r.netPay?.toFixed(2)}</td>
+                    <td className="py-3 text-right text-gray-700">{money(r.basePay)}</td>
+                    <td className="py-3 text-right text-orange-600">{money(r.overtimePay)}</td>
+                    <td className="py-3 text-right text-red-500">-{money(r.totalDeductions)}</td>
+                    <td className="py-3 text-right font-extrabold text-gray-900">{money(r.netPay)}</td>
                     <td className="py-3">
                       <span className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${PAYROLL_STATUS[r.status]}`}>{r.status}</span>
                     </td>

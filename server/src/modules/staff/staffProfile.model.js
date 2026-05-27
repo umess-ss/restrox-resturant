@@ -50,7 +50,7 @@ const staffProfileSchema = new mongoose.Schema(
     salaryType: { type: String, enum: ['monthly', 'hourly'], default: 'monthly' },
     baseSalary: { type: Number, required: true, min: 0 },   // monthly amount OR hourly rate
     overtimeRate: { type: Number, default: 1.5 },            // multiplier on hourly rate
-    currency: { type: String, default: 'USD' },
+    currency: { type: String, default: 'NPR' },
 
     // Shift template (default working hours)
     defaultShiftStart: { type: String, default: '09:00' },   // HH:mm

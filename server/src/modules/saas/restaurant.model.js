@@ -29,7 +29,7 @@ const restaurantSchema = new mongoose.Schema(
     logo: { type: String },
     address: { type: String, trim: true },
     timezone: { type: String, default: 'UTC' },
-    currency: { type: String, default: 'USD' },
+    currency: { type: String, default: 'NPR' },
     taxRate: { type: Number, default: 0.1 },
 
     // Subscription

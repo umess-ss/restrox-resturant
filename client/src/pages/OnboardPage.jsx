@@ -5,9 +5,9 @@ import { onboardRestaurant } from '../api/saas.api.js';
 import useAuthStore from '../store/authStore.js';
 
 const PLANS = [
-  { key: 'trial',   label: 'Free Trial',  price: '$0',   period: '14 days', features: ['1 branch', '5 staff', '500 orders/mo'] },
-  { key: 'starter', label: 'Starter',     price: '$49',  period: '/month',  features: ['1 branch', '20 staff', '5,000 orders/mo'] },
-  { key: 'growth',  label: 'Growth',      price: '$149', period: '/month',  features: ['3 branches', '50 staff', '50,000 orders/mo', 'Payroll module'] },
+  { key: 'trial',   label: 'Free Trial',  price: 'Rs. 0',      period: '14 days', features: ['1 branch', '5 staff', '500 orders/mo'] },
+  { key: 'starter', label: 'Starter',     price: 'Rs. 4,900',  period: '/month',  features: ['1 branch', '20 staff', '5,000 orders/mo'] },
+  { key: 'growth',  label: 'Growth',      price: 'Rs. 14,900', period: '/month',  features: ['3 branches', '50 staff', '50,000 orders/mo', 'Payroll module'] },
   { key: 'enterprise', label: 'Enterprise', price: 'Custom', period: '',   features: ['Unlimited branches', 'Unlimited staff', 'Priority support', 'Custom integrations'] },
 ];
 
@@ -17,7 +17,7 @@ export default function OnboardPage() {
   const [form, setForm] = useState({
     restaurantName: '', ownerName: '', ownerEmail: '', ownerPassword: '',
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-    currency: 'USD',
+    currency: 'NPR',
   });
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -161,7 +161,7 @@ export default function OnboardPage() {
                     <label className="mb-2 block text-sm font-semibold text-[#111827]">Currency</label>
                     <select value={form.currency} onChange={(e) => set('currency', e.target.value)}
                       className="w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-3 text-sm text-[#111827] outline-none transition focus:border-[#F97316] focus:ring-4 focus:ring-[#FFEDD5]">
-                      {['USD', 'EUR', 'GBP', 'INR', 'AUD', 'CAD'].map((c) => <option key={c}>{c}</option>)}
+                      {['NPR'].map((c) => <option key={c}>{c}</option>)}
                     </select>
                   </div>
                   <div>

@@ -9,6 +9,7 @@ import {
   fetchStockSummary,
 } from '../api/inventory.api.js';
 import { useInventoryEvents } from '../socket/SocketContext.jsx';
+import formatCurrency from '../utils/formatCurrency.js';
 
 const UNITS = ['kg', 'g', 'l', 'ml', 'pcs', 'dozen', 'box'];
 const WASTAGE_REASONS = ['expired', 'spoiled', 'damaged', 'spillage', 'other'];
@@ -149,7 +150,7 @@ export default function InventoryPage() {
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
             <p className="text-xs text-gray-500">Total Value</p>
-            <p className="text-2xl font-bold text-gray-800">${summary.totalInventoryValue.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-gray-800">{formatCurrency(summary.totalInventoryValue)}</p>
           </div>
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
             <p className="text-xs text-gray-500">Ingredients</p>
@@ -197,7 +198,7 @@ export default function InventoryPage() {
                 <td className="px-4 py-3 font-medium text-gray-800">{item.name}</td>
                 <td className="px-4 py-3 text-gray-700">{formatStock(item.quantity, item.unit)}</td>
                 <td className="px-4 py-3 text-gray-500">{formatStock(item.threshold, item.unit)}</td>
-                <td className="px-4 py-3 text-gray-500">${item.costPerUnit}</td>
+                <td className="px-4 py-3 text-gray-500">{formatCurrency(item.costPerUnit)}</td>
                 <td className="px-4 py-3 text-gray-500">{item.supplier?.name}</td>
                 <td className="px-4 py-3">
                   <StockBadge quantity={item.quantity} threshold={item.threshold} />

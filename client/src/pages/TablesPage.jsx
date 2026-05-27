@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import { fetchTables, createTable, updateTable, fetchTableQR } from '../api/tables.api.js';
+import formatCurrency from '../utils/formatCurrency.js';
 
 const STATUS_STYLES = {
   available: { card: 'border-green-300 bg-green-50',  badge: 'bg-green-100 text-green-700',  label: 'Available' },
@@ -328,7 +329,7 @@ export default function TablesPage() {
                 <div className="text-xs bg-white/70 rounded-lg p-1.5 border border-gray-200">
                   <p className="font-medium text-gray-700">{table.currentOrder.orderNumber}</p>
                   <p className="text-gray-500 capitalize">{table.currentOrder.status}</p>
-                  <p className="text-orange-600 font-semibold">${table.currentOrder.totalAmount?.toFixed(2)}</p>
+                  <p className="text-orange-600 font-semibold">{formatCurrency(table.currentOrder.totalAmount)}</p>
                 </div>
               )}
 

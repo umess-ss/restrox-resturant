@@ -29,7 +29,7 @@ export const onboardRestaurant = async (req, res) => {
     slug,
     email: ownerEmail,
     timezone: timezone || 'UTC',
-    currency: currency || 'USD',
+    currency: currency || 'NPR',
     plan: 'trial',
     planExpiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days
   });
