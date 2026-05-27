@@ -549,11 +549,22 @@ export const getReceiptPdf = async (orderId) => {
   const textWidth = (text, size = fontSize) => clean(text).length * size * 0.6;
   const content = rows.map((entry, i) => {
     const size = entry.size || (entry.strong ? 10 : fontSize);
-    const text = entry.label ? row(`${entry.label}:`, entry.value) : entry.text;
+    const y = height - margin - (i + 1) * lineHeight;
+
+    if (entry.label) {
+      const label = `${entry.label}:`;
+      const value = entry.value;
+      const valueX = Math.max(margin + 70, width - margin - textWidth(value, size));
+      return [
+        `BT /F1 ${size} Tf ${margin.toFixed(2)} ${y.toFixed(2)} Td (${escapePdf(label)}) Tj ET`,
+        `BT /F1 ${size} Tf ${valueX.toFixed(2)} ${y.toFixed(2)} Td (${escapePdf(value)}) Tj ET`,
+      ].join('\n');
+    }
+
+    const text = entry.text;
     const x = entry.align === 'center'
       ? Math.max(margin, (width - textWidth(text, size)) / 2)
       : margin;
-    const y = height - margin - (i + 1) * lineHeight;
     return `BT /F1 ${size} Tf ${x.toFixed(2)} ${y.toFixed(2)} Td (${escapePdf(text)}) Tj ET`;
   }).join('\n');
 
