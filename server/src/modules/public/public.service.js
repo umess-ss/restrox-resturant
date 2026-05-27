@@ -169,6 +169,64 @@ export const getPublicMenu = async (restaurantId, _branchId) => {
   return { items: publicItems, grouped, total: publicItems.length };
 };
 
+const getAvailableMenuItemsForOrder = async (restaurantId, menuIds, session) => {
+  let menuItems = await MenuItem.find({
+    _id: { $in: menuIds },
+    $or: [
+      { restaurant: restaurantId },
+      { restaurant: { $exists: false } },
+      { restaurant: null },
+    ],
+    isAvailable: true,
+  }).session(session);
+
+  if (menuItems.length !== menuIds.length) {
+    const restaurantMenuCount = await MenuItem.countDocuments({
+      $or: [
+        { restaurant: restaurantId },
+        { restaurant: { $exists: false } },
+        { restaurant: null },
+      ],
+      isAvailable: true,
+    }).session(session);
+
+    if (restaurantMenuCount === 0) {
+      menuItems = await MenuItem.find({
+        _id: { $in: menuIds },
+        isAvailable: true,
+      }).session(session);
+    }
+  }
+
+  return menuItems;
+};
+
+const snapshotOrderItems = async (restaurantId, itemInputs, session) => {
+  const menuIds = itemInputs.map((i) => {
+    assertObjectId(i.menuItem, 'menuItem');
+    return i.menuItem;
+  });
+  const menuItems = await getAvailableMenuItemsForOrder(restaurantId, menuIds, session);
+  const menuMap = new Map(menuItems.map((m) => [m._id.toString(), m]));
+
+  return itemInputs.map((input) => {
+    const mi = menuMap.get(input.menuItem.toString());
+    if (!mi) {
+      throw Object.assign(
+        new Error(`Menu item not found or unavailable: ${input.menuItem}`),
+        { status: 422 }
+      );
+    }
+    return {
+      menuItem: mi._id,
+      name: mi.name,
+      price: mi.price,
+      quantity: input.quantity,
+      notes: input.notes?.trim() || undefined,
+    };
+  });
+};
+
 // ─── Create customer order ────────────────────────────────────────────────────
 
 /**
@@ -244,54 +302,7 @@ export const createCustomerOrder = async ({
     }
 
     // ── 4. Validate + snapshot menu items — never trust frontend price ───────
-    const menuIds = itemInputs.map((i) => i.menuItem);
-    let menuItems = await MenuItem.find({
-      _id: { $in: menuIds },
-      $or: [
-        { restaurant: restaurantId },
-        { restaurant: { $exists: false } },
-        { restaurant: null },
-      ],
-      isAvailable: true,
-    }).session(session);
-
-    if (menuItems.length !== menuIds.length) {
-      const restaurantMenuCount = await MenuItem.countDocuments({
-        $or: [
-          { restaurant: restaurantId },
-          { restaurant: { $exists: false } },
-          { restaurant: null },
-        ],
-        isAvailable: true,
-      }).session(session);
-
-      if (restaurantMenuCount === 0) {
-        menuItems = await MenuItem.find({
-          _id: { $in: menuIds },
-          isAvailable: true,
-        }).session(session);
-      }
-    }
-
-    const menuMap = new Map(menuItems.map((m) => [m._id.toString(), m]));
-
-    const items = itemInputs.map((input) => {
-      assertObjectId(input.menuItem, 'menuItem');
-      const mi = menuMap.get(input.menuItem.toString());
-      if (!mi) {
-        throw Object.assign(
-          new Error(`Menu item not found or unavailable: ${input.menuItem}`),
-          { status: 422 }
-        );
-      }
-      return {
-        menuItem: mi._id,
-        name: mi.name,
-        price: mi.price,          // ← always from DB, never from request
-        quantity: input.quantity,
-        notes: input.notes?.trim() || undefined,
-      };
-    });
+    const items = await snapshotOrderItems(restaurantId, itemInputs, session);
 
     // ── 5. Calculate financials on backend ───────────────────────────────────
     const taxRate = restaurant.taxRate ?? 0.1;
@@ -354,6 +365,81 @@ export const createCustomerOrder = async ({
   }
 };
 
+export const addItemsToCustomerOrder = async (orderId, itemInputs) => {
+  assertObjectId(orderId, 'orderId');
+
+  if (!Array.isArray(itemInputs) || itemInputs.length === 0) {
+    throw Object.assign(new Error('At least one item required'), { status: 400 });
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  let committed = false;
+
+  try {
+    const order = await Order.findById(orderId).session(session);
+    if (!order) throw Object.assign(new Error('Order not found'), { status: 404 });
+
+    if (order.paymentStatus === 'paid' || ['paid', 'cancelled'].includes(order.status)) {
+      throw Object.assign(new Error('Cannot add items after payment or cancellation'), { status: 422 });
+    }
+
+    const newItems = await snapshotOrderItems(order.restaurant, itemInputs, session);
+
+    newItems.forEach((newItem) => {
+      const existing = order.items.find((item) => (
+        item.itemStatus === 'pending'
+        && item.menuItem?.toString() === newItem.menuItem.toString()
+        && (item.notes || '') === (newItem.notes || '')
+      ));
+
+      if (existing) {
+        existing.quantity += newItem.quantity;
+      } else {
+        order.items.push(newItem);
+      }
+    });
+
+    const financials = calcFinancials(order.items, {
+      taxRate: order.taxRate,
+      discountType: order.discountType,
+      discountValue: order.discountValue,
+    });
+    Object.assign(order, financials);
+
+    if (order.billStatus !== 'not_requested') {
+      order.billStatus = 'not_requested';
+      order.billGeneratedAt = undefined;
+    }
+
+    if (['ready', 'served'].includes(order.status)) {
+      order.status = 'confirmed';
+      order.statusHistory.push({
+        status: 'confirmed',
+        note: 'Customer added more items',
+      });
+    }
+
+    await order.save({ session });
+    await session.commitTransaction();
+    committed = true;
+
+    const populatedOrder = await Order.findById(order._id)
+      .populate('table', 'number location')
+      .lean();
+
+    emitCustomerOrderEvent(getIO(), populatedOrder, EVENTS.ORDER_ITEMS_ADDED);
+    logger.info(`[QR] ${newItems.length} item line(s) added to order ${order.orderNumber}`);
+
+    return getOrderStatus(order._id);
+  } catch (err) {
+    if (!committed) await session.abortTransaction();
+    throw err;
+  } finally {
+    session.endSession();
+  }
+};
+
 // ─── Order status ─────────────────────────────────────────────────────────────
 
 /**
@@ -365,7 +451,7 @@ export const getOrderStatus = async (orderId) => {
   assertObjectId(orderId, 'orderId');
 
   const order = await Order.findById(orderId)
-    .select('orderNumber status paymentStatus billStatus kotNumber totalAmount createdAt items source')
+    .select('restaurant branch table orderNumber status paymentStatus billStatus kotNumber totalAmount createdAt items source')
     .populate('table', 'number')
     .populate('items.menuItem', 'preparationTime') // only prep time — no cost/recipe fields
     .lean();
@@ -398,6 +484,9 @@ export const getOrderStatus = async (orderId) => {
 
   return {
     orderId: order._id,
+    restaurantId: order.restaurant,
+    branchId: order.branch,
+    tableId: order.table?._id,
     orderNumber: order.orderNumber,
     kotNumber: order.kotNumber,
     status: order.status,

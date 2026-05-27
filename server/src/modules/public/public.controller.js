@@ -8,6 +8,7 @@ import {
   resolveTable,
   getPublicMenu,
   createCustomerOrder,
+  addItemsToCustomerOrder,
   getOrderStatus,
   callWaiterForOrder,
   getPublicBill,
@@ -67,6 +68,13 @@ export const placeOrder = async (req, res) => {
     paymentStatus: order.paymentStatus,
     totalAmount:   order.totalAmount,
   });
+};
+
+// ─── POST /api/public/orders/:orderId/items
+
+export const addOrderItems = async (req, res) => {
+  const data = await addItemsToCustomerOrder(req.params.orderId, req.body.items);
+  res.json({ success: true, ...data });
 };
 
 // ─── GET /api/public/orders/:orderId/status

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   fetchPublicOrderStatus,
   fetchPublicBill,
@@ -243,6 +243,7 @@ function FeedbackForm({ orderId }) {
 
 export default function CustomerOrderStatusPage() {
   const { orderId } = useParams();
+  const navigate = useNavigate();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -323,6 +324,11 @@ export default function CustomerOrderStatusPage() {
     }
   };
 
+  const handleAddMoreItems = () => {
+    if (!order?.restaurantId || !order?.branchId || !order?.tableId) return;
+    navigate(`/customer/${order.restaurantId}/${order.branchId}/table/${order.tableId}?orderId=${orderId}`);
+  };
+
   const handleMockPayment = async (method) => {
     setPaymentLoading(method);
     try {
@@ -374,6 +380,8 @@ export default function CustomerOrderStatusPage() {
 
   const currentIdx = STATUS_ORDER.indexOf(order.status);
   const isClosed = ['paid', 'cancelled'].includes(order.status);
+  const canAddItems = !isClosed && order.paymentStatus !== 'paid'
+    && order.restaurantId && order.branchId && order.tableId;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-10">
@@ -434,7 +442,17 @@ export default function CustomerOrderStatusPage() {
 
         {/* Items */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">Your Items</h2>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Your Items</h2>
+            {canAddItems && (
+              <button
+                onClick={handleAddMoreItems}
+                className="rounded-full bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-600 hover:bg-orange-100"
+              >
+                Add More Items
+              </button>
+            )}
+          </div>
           <div className="space-y-2">
             {order.items?.map((item, i) => (
               <div key={i} className="flex items-start justify-between gap-2">

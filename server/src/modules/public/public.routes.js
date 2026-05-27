@@ -12,6 +12,7 @@ import {
   getTableInfo,
   getMenu,
   placeOrder,
+  addOrderItems,
   getStatus,
   callWaiter,
   getBill,
@@ -71,6 +72,19 @@ router.post(
   ],
   validate,
   placeOrder
+);
+
+// ─── Add more items to active customer order ─────────────────────────────────
+router.post(
+  '/orders/:orderId/items',
+  [
+    body('items').isArray({ min: 1 }).withMessage('At least one item required'),
+    body('items.*.menuItem').isMongoId().withMessage('Valid menuItem ID required'),
+    body('items.*.quantity').isInt({ min: 1 }).withMessage('Quantity must be >= 1'),
+    body('items.*.notes').optional().trim().isLength({ max: 100 }),
+  ],
+  validate,
+  addOrderItems
 );
 
 // ─── Order status polling ─────────────────────────────────────────────────────

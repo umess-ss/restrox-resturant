@@ -1,6 +1,11 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { fetchPublicTable, fetchPublicMenu, placePublicOrder } from '../../api/public.api.js';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  appendPublicOrderItems,
+  fetchPublicTable,
+  fetchPublicMenu,
+  placePublicOrder,
+} from '../../api/public.api.js';
 import formatCurrency from '../../utils/formatCurrency.js';
 
 const CAT_META = {
@@ -96,6 +101,9 @@ function NotesModal({ item, current, onSave, onClose }) {
 export default function CustomerTablePage() {
   const { restaurantId, branchId, tableId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const appendOrderId = searchParams.get('orderId');
+  const isAppendMode = Boolean(appendOrderId);
 
   const [tableInfo, setTableInfo] = useState(null);
   const [menu, setMenu] = useState({ items: [], grouped: {} });
@@ -167,22 +175,30 @@ export default function CustomerTablePage() {
     if (submitting || !cart.length) return;
     setSubmitting(true);
     try {
+      const items = cart.map((c) => ({
+        menuItem: c._id,
+        quantity: c.qty,
+        notes: c.notes || undefined,
+      }));
+
+      if (isAppendMode) {
+        await appendPublicOrderItems(appendOrderId, { items });
+        navigate(`/customer/order/${appendOrderId}/status`, { replace: true });
+        return;
+      }
+
       const result = await placePublicOrder({
         restaurantId,
         branchId,
         tableId,
-        items: cart.map((c) => ({
-          menuItem: c._id,
-          quantity: c.qty,
-          notes: c.notes || undefined,
-        })),
+        items,
         customerName: customerName || undefined,
         customerPhone: customerPhone || undefined,
         customerNote: customerNote || undefined,
       });
       navigate(`/customer/order/${result.orderId}/status`, { replace: true });
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to place order. Please try again.');
+      alert(err.response?.data?.message || 'Failed to update order. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -250,7 +266,7 @@ export default function CustomerTablePage() {
           </label>
 
           <div className="rounded-full bg-red-600 px-5 py-3 text-sm font-extrabold text-white">
-            Cart {cartCount}
+            {isAppendMode ? 'Add More' : 'Cart'} {cartCount}
           </div>
         </header>
 
@@ -422,27 +438,35 @@ export default function CustomerTablePage() {
 
             <div className="mt-5 space-y-3 rounded-2xl bg-white p-4">
               <p className="text-xs font-black uppercase tracking-wide text-gray-400">Your details</p>
+              {isAppendMode && (
+                <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-600">
+                  Adding items to your current order.
+                </p>
+              )}
               <input
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 placeholder="Name optional"
+                disabled={isAppendMode}
                 maxLength={60}
-                className="h-11 w-full rounded-xl bg-gray-50 px-3 text-sm font-semibold outline-none ring-1 ring-gray-100 focus:ring-red-200"
+                className="h-11 w-full rounded-xl bg-gray-50 px-3 text-sm font-semibold outline-none ring-1 ring-gray-100 focus:ring-red-200 disabled:cursor-not-allowed disabled:opacity-50"
               />
               <input
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
                 placeholder="Phone optional"
+                disabled={isAppendMode}
                 maxLength={20}
-                className="h-11 w-full rounded-xl bg-gray-50 px-3 text-sm font-semibold outline-none ring-1 ring-gray-100 focus:ring-red-200"
+                className="h-11 w-full rounded-xl bg-gray-50 px-3 text-sm font-semibold outline-none ring-1 ring-gray-100 focus:ring-red-200 disabled:cursor-not-allowed disabled:opacity-50"
               />
               <textarea
                 value={customerNote}
                 onChange={(e) => setCustomerNote(e.target.value)}
                 placeholder="Table note optional"
+                disabled={isAppendMode}
                 maxLength={200}
                 rows={2}
-                className="w-full resize-none rounded-xl bg-gray-50 px-3 py-3 text-sm font-semibold outline-none ring-1 ring-gray-100 focus:ring-red-200"
+                className="w-full resize-none rounded-xl bg-gray-50 px-3 py-3 text-sm font-semibold outline-none ring-1 ring-gray-100 focus:ring-red-200 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
 
@@ -464,7 +488,7 @@ export default function CustomerTablePage() {
                 disabled={submitting || cart.length === 0}
                 className="mt-4 w-full rounded-full bg-red-600 py-4 text-sm font-black text-white shadow-xl shadow-red-100 transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
               >
-                {submitting ? 'Confirming...' : 'Confirm Order'}
+                {submitting ? 'Confirming...' : isAppendMode ? 'Add Items to Order' : 'Confirm Order'}
               </button>
             </div>
           </aside>

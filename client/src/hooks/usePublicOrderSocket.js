@@ -54,6 +54,7 @@ export default function usePublicOrderSocket(orderId, onUpdate) {
     };
 
     socket.on(EVENTS.ORDER_STATUS_CHANGED, handleUpdate);
+    socket.on(EVENTS.ORDER_ITEMS_ADDED, handleUpdate);
     socket.on(EVENTS.ORDER_ITEM_STATUS_CHANGED, handleUpdate);
     socket.on(EVENTS.ORDER_PAID, handleUpdate);
     socket.on(EVENTS.BILL_PRESENTED, handleUpdate);

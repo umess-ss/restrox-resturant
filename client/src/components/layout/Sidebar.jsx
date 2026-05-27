@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 
 const links = [
@@ -23,6 +24,11 @@ export default function Sidebar() {
   const location = useLocation();
   const isStaff = location.pathname === '/staff';
   const activeStaffTab = new URLSearchParams(location.search).get('tab') || 'dashboard';
+  const [staffOpen, setStaffOpen] = useState(isStaff);
+
+  useEffect(() => {
+    if (isStaff) setStaffOpen(true);
+  }, [isStaff]);
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col bg-white text-gray-900 shadow-sm lg:flex">
@@ -51,29 +57,41 @@ export default function Sidebar() {
         ))}
 
         <div className="space-y-2">
-          <NavLink
-            to="/staff?tab=dashboard"
-            className={() =>
-              `flex min-h-14 items-center gap-5 rounded-2xl px-5 py-4 text-sm font-bold transition-all ${
-                isStaff
-                  ? 'bg-orange-500 text-white shadow-xl shadow-orange-100'
-                  : 'text-[#9b94ad] hover:bg-orange-50 hover:text-orange-500'
-              }`
-            }
+          <div
+            className={`flex min-h-14 items-center overflow-hidden rounded-2xl text-sm font-bold transition-all ${
+              isStaff
+                ? 'bg-orange-500 text-white shadow-xl shadow-orange-100'
+                : 'text-[#9b94ad] hover:bg-orange-50 hover:text-orange-500'
+            }`}
           >
-            <span className="grid h-6 w-6 place-items-center text-lg leading-none">♟</span>
-            Staff
-            <span className="ml-auto text-xs">{isStaff ? '⌃' : '⌄'}</span>
-          </NavLink>
+            <NavLink
+              to="/staff?tab=dashboard"
+              className="flex min-h-14 flex-1 items-center gap-5 px-5 py-4"
+            >
+              <span className="grid h-6 w-6 place-items-center text-lg leading-none">♟</span>
+              Staff
+            </NavLink>
+            <button
+              type="button"
+              onClick={() => setStaffOpen((open) => !open)}
+              aria-label={staffOpen ? 'Hide staff menu' : 'Show staff menu'}
+              aria-expanded={staffOpen}
+              className={`mr-3 grid h-8 w-8 shrink-0 place-items-center rounded-xl text-xs transition ${
+                isStaff ? 'text-white hover:bg-white/15' : 'text-[#9b94ad] hover:bg-orange-100 hover:text-orange-500'
+              }`}
+            >
+              {staffOpen ? '⌃' : '⌄'}
+            </button>
+          </div>
 
-          {isStaff && (
-            <div className="ml-7 space-y-1 border-l border-orange-100 pl-4">
+          {staffOpen && (
+            <div className="ml-7 space-y-1 border-l border-orange-100 py-1 pl-4">
               {staffLinks.map((item) => (
                 <Link
                   key={item.tab}
                   to={item.to}
                   className={`block rounded-xl px-4 py-2 text-xs font-bold transition ${
-                    activeStaffTab === item.tab
+                    isStaff && activeStaffTab === item.tab
                       ? 'bg-orange-50 text-orange-600'
                       : 'text-[#9b94ad] hover:bg-orange-50 hover:text-orange-500'
                   }`}

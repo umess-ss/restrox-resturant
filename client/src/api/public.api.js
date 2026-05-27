@@ -32,6 +32,9 @@ export const fetchPublicMenu = (restaurantId, branchId) =>
 export const placePublicOrder = (data) =>
   pub.post('/public/orders', data).then((r) => r.data);
 
+export const appendPublicOrderItems = (orderId, data) =>
+  pub.post(`/public/orders/${orderId}/items`, data).then((r) => r.data);
+
 // ─── Order status ─────────────────────────────────────────────────────────────
 export const fetchPublicOrderStatus = (orderId) =>
   pub.get(`/public/orders/${orderId}/status`).then((r) => r.data);
