@@ -82,6 +82,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Create backend env file
+        run: cp server/.env.example server/.env
+
       - name: Validate docker compose
         run: docker compose config
 
