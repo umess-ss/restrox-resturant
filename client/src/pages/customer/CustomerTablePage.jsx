@@ -207,6 +207,51 @@ function TrackPanel({ order, loading, onRefresh }) {
   );
 }
 
+function QrPaymentSheet({ order, tableInfo, onClose }) {
+  const amount = order?.totalAmount || 0;
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/55 p-3 sm:items-center">
+      <div className="w-full max-w-sm rounded-[2rem] bg-white p-5 shadow-2xl">
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-wide text-red-600">QR Payment</p>
+            <h3 className="mt-1 text-xl font-black text-gray-950">
+              {amount ? formatCurrency(amount) : 'No bill yet'}
+            </h3>
+            <p className="mt-1 text-sm font-semibold text-gray-400">
+              {tableInfo?.branch?.name || 'Branch'} · Table {tableInfo?.table?.number || '-'}
+            </p>
+          </div>
+          <button onClick={onClose} className="grid h-10 w-10 place-items-center rounded-full bg-gray-100 text-xl text-gray-500">×</button>
+        </div>
+
+        <div className="mx-auto grid aspect-square w-56 place-items-center rounded-[1.5rem] bg-white p-4 ring-1 ring-gray-100">
+          <div className="grid h-full w-full grid-cols-5 grid-rows-5 gap-1 rounded-xl bg-gray-950 p-2">
+            {Array.from({ length: 25 }).map((_, index) => (
+              <span
+                key={index}
+                className={`rounded-sm ${[0, 1, 3, 5, 6, 8, 10, 12, 13, 16, 18, 19, 21, 23, 24].includes(index) ? 'bg-white' : 'bg-gray-950'}`}
+              />
+            ))}
+          </div>
+        </div>
+
+        <p className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-center text-sm font-bold text-red-600">
+          Scan at counter or show this to staff for payment.
+        </p>
+        {order?.orderNumber && (
+          <button
+            onClick={onClose}
+            className="mt-3 w-full rounded-full bg-red-600 py-4 text-sm font-black text-white shadow-xl shadow-red-100"
+          >
+            Done
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function CustomerTablePage() {
   const { restaurantId, branchId, tableId } = useParams();
   const navigate = useNavigate();
@@ -230,6 +275,7 @@ export default function CustomerTablePage() {
   const [currentOrderId, setCurrentOrderId] = useState(appendOrderId || '');
   const [currentOrder, setCurrentOrder] = useState(null);
   const [orderLoading, setOrderLoading] = useState(false);
+  const [showQrPayment, setShowQrPayment] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -372,7 +418,7 @@ export default function CustomerTablePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#e9e9f1] px-3 py-3 text-gray-950 sm:px-5 sm:py-5 lg:px-8 lg:py-8">
+    <div className="min-h-screen bg-[#e9e9f1] px-3 pb-28 pt-3 text-gray-950 sm:px-5 sm:py-5 lg:px-8 lg:py-8">
       <div className="mx-auto w-full max-w-[1440px] rounded-[1.25rem] bg-white/80 p-3 shadow-2xl shadow-gray-300/70 ring-1 ring-white sm:rounded-[2rem] sm:p-5">
         <header className="mb-4 flex flex-wrap items-center gap-3 rounded-[1.25rem] bg-white px-3 py-3 shadow-sm sm:rounded-[1.5rem] sm:px-5 lg:flex-nowrap">
           <div className="mr-auto min-w-0 text-lg font-black tracking-tight text-red-600 sm:mr-3 sm:text-xl">
@@ -414,7 +460,29 @@ export default function CustomerTablePage() {
           </div>
         </header>
 
-        <div className="mb-4 grid grid-cols-3 gap-2 rounded-[1.25rem] bg-white p-2 shadow-sm">
+        <section className="mb-4 rounded-[1.25rem] bg-white p-4 shadow-sm sm:hidden">
+          <div className="flex items-center gap-3">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-red-50 text-lg font-black text-red-600">
+              {(customerName || tableInfo?.restaurant?.name || 'G').charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-black text-gray-950">
+                {customerName || 'Guest customer'}
+              </p>
+              <p className="truncate text-xs font-bold text-gray-400">
+                {tableInfo?.restaurant?.name || 'Restaurant'} · Table {tableInfo?.table?.number || '-'}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowQrPayment(true)}
+              className="rounded-full bg-gray-950 px-4 py-3 text-xs font-black text-white"
+            >
+              QR Pay
+            </button>
+          </div>
+        </section>
+
+        <div className="mb-4 hidden grid-cols-3 gap-2 rounded-[1.25rem] bg-white p-2 shadow-sm sm:grid">
           {[
             { key: 'menu', label: 'Menu' },
             { key: 'order', label: 'Order' },
@@ -674,6 +742,64 @@ export default function CustomerTablePage() {
         </div>
         )}
       </div>
+
+      <nav className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-5 items-end rounded-[2rem] bg-white px-3 pb-3 pt-2 shadow-2xl shadow-gray-400/40 ring-1 ring-gray-100 sm:hidden">
+        {[
+          { key: 'menu', label: 'Home', icon: '⌂' },
+          { key: 'order', label: 'Cart', icon: '☰' },
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`grid justify-items-center gap-1 rounded-2xl px-2 py-2 text-xs font-black ${
+              activeTab === tab.key ? 'text-red-600' : 'text-gray-400'
+            }`}
+          >
+            <span className="text-xl leading-none">{tab.icon}</span>
+            {tab.label}
+          </button>
+        ))}
+
+        <button
+          onClick={() => setShowQrPayment(true)}
+          className="-mt-8 grid h-16 w-16 place-items-center justify-self-center rounded-full bg-red-600 text-2xl font-black text-white shadow-xl shadow-red-200 ring-4 ring-[#e9e9f1]"
+          aria-label="Open QR payment"
+        >
+          ▦
+        </button>
+
+        {[
+          { key: 'track', label: 'Track', icon: '◷', disabled: !currentOrderId },
+          { key: 'user', label: 'User', icon: '◉' },
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => {
+              if (tab.disabled) return;
+              if (tab.key === 'user') {
+                setActiveTab('order');
+                return;
+              }
+              setActiveTab(tab.key);
+            }}
+            disabled={tab.disabled}
+            className={`grid justify-items-center gap-1 rounded-2xl px-2 py-2 text-xs font-black ${
+              activeTab === tab.key ? 'text-red-600' : 'text-gray-400'
+            } disabled:text-gray-200`}
+          >
+            <span className="text-xl leading-none">{tab.icon}</span>
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
+      {showQrPayment && (
+        <QrPaymentSheet
+          order={currentOrder}
+          tableInfo={tableInfo}
+          onClose={() => setShowQrPayment(false)}
+        />
+      )}
 
       {notesModal && (
         <NotesModal
