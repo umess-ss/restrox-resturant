@@ -105,6 +105,11 @@ app.get('/api/health', (_, res) => res.json({
   timestamp: new Date().toISOString(),
 }));
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
+app.get('/', (_, res) => res.json({
+  status: 'ok',
+  service: 'restrox-backend',
+  health: '/api/health',
+}));
 
 // ─── Static frontend ─────────────────────────────────────────────────────────
 app.use(express.static(publicDir));

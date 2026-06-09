@@ -17,6 +17,9 @@
     "android": {},
     "extra": {
       "apiUrl": "http://localhost:5000/api"
-    }
+    },
+    "plugins": [
+      "expo-status-bar"
+    ]
   }
 }
